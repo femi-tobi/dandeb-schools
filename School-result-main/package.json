@@ -1,0 +1,20 @@
+{
+  "name": "bosol-results",
+  "version": "1.0.0",
+  "description": "- Node.js + Express + SQLite\r - Start: `cd backend && npm install && npm run dev`",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/femi-tobi/School-result.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/femi-tobi/School-result/issues"
+  },
+  "homepage": "https://github.com/femi-tobi/School-result#readme"
+}
