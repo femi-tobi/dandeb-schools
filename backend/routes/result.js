@@ -25,25 +25,36 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 router.post('/manual', async (req, res) => {
-  const { student_id, subject, ca1 = 0, ca2 = 0, ca3 = 0, score, grade, term, session, remark = '' } = req.body;
+  const { student_id, subject, ca1 = 0, ca2 = 0, ca3 = 0, score, grade, term, session, remark = '', class: className } = req.body;
+  if (!student_id || !subject || !term || !session || !className) {
+    return res.status(400).json({ message: 'student_id, subject, term, session, and class are required.' });
+  }
   const db = await openDb();
   await db.run(
-    'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, 0]
+    'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, 0, className]
   );
   res.json({ message: 'Result added' });
 });
 
 // Fetch results by class
 router.get('/', async (req, res) => {
-  const { class: className } = req.query;
+  const { student_id, subject, term, session, class: className, approved } = req.query;
   const db = await openDb();
-  let results;
-  if (className) {
-    results = await db.all('SELECT * FROM results WHERE class = ? AND approved = 1', [className]);
-  } else {
-    results = await db.all('SELECT * FROM results WHERE approved = 1');
-  }
+
+  const whereClauses = [];
+  const params = [];
+
+  if (student_id) { whereClauses.push('student_id = ?'); params.push(student_id); }
+  if (subject) { whereClauses.push('subject = ?'); params.push(subject); }
+  if (term) { whereClauses.push('term = ?'); params.push(term); }
+  if (session) { whereClauses.push('session = ?'); params.push(session); }
+  if (className) { whereClauses.push('class = ?'); params.push(className); }
+  if (approved !== undefined) { whereClauses.push('approved = ?'); params.push(Number(approved) ? 1 : 0); }
+
+  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const sql = `SELECT * FROM results ${whereSql}`;
+  const results = await db.all(sql, params);
   res.json(results);
 });
 

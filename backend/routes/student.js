@@ -170,6 +170,13 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   // Move doc.y to below info section
   doc.y = y + 30;
 
+  // Insert additional section image (Regularity, Conduct, Physical Development)
+  const extraSectionPath = path.join(__dirname, 'report_extra_section.jpg');
+  try {
+    doc.image(extraSectionPath, borderMargin, doc.y + 10, { width: usableWidth });
+    doc.y = doc.y + 10 + (usableWidth * 0.5); // approximate advance; image height depends on aspect ratio
+  } catch {}
+
 // === MAIN RESULT TABLE ===
 const margin = borderMargin;
 const colWidths = [

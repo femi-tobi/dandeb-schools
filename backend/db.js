@@ -74,6 +74,12 @@ export async function initDb() {
         remark TEXT
       );
     `);
+    // Ensure additional columns exist on results table
+    try { await db.exec('ALTER TABLE results ADD COLUMN ca1 INTEGER DEFAULT 0'); } catch (_) {}
+    try { await db.exec('ALTER TABLE results ADD COLUMN ca2 INTEGER DEFAULT 0'); } catch (_) {}
+    try { await db.exec('ALTER TABLE results ADD COLUMN ca3 INTEGER DEFAULT 0'); } catch (_) {}
+    try { await db.exec('ALTER TABLE results ADD COLUMN remark TEXT'); } catch (_) {}
+    try { await db.exec('ALTER TABLE results ADD COLUMN approved INTEGER DEFAULT 0'); } catch (_) {}
     console.log('Database tables created or already exist.');
   } catch (err) {
     console.error('Error creating tables:', err);
