@@ -194,8 +194,30 @@ export default function TeacherDashboard() {
   const handleAddBatchRow = () => {
     setBatchResults(prev => [...prev, { subject: '', ca1: '', ca2: '', ca3: '', exam: '', grade: '', remark: '' }]);
   };
-  const handleBatchRowChange = (idx, field, value) => {
+  const handleBatchRowChange = async (idx, field, value) => {
     setBatchResults(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
+    // Autosave the row after change
+    const updatedRow = { ...batchResults[idx], [field]: value };
+    if (modalStudent && updatedRow.subject && updatedRow.ca1 && updatedRow.ca2 && updatedRow.ca3 && updatedRow.exam && updatedRow.grade && updatedRow.remark) {
+      try {
+        await axios.post('http://localhost:5000/api/results/manual', {
+          student_id: modalStudent.student_id,
+          subject: updatedRow.subject,
+          ca1: updatedRow.ca1 || 0,
+          ca2: updatedRow.ca2 || 0,
+          ca3: updatedRow.ca3 || 0,
+          score: updatedRow.exam || 0,
+          grade: updatedRow.grade,
+          remark: updatedRow.remark,
+          term,
+          session,
+          class: selectedClass
+        });
+        setModalMsg('Result autosaved!');
+      } catch (err) {
+        setModalMsg('Error autosaving result.');
+      }
+    }
   };
   const handleRemoveBatchRow = (idx) => {
     setBatchResults(prev => prev.filter((_, i) => i !== idx));
@@ -560,4 +582,4 @@ export default function TeacherDashboard() {
       </main>
     </div>
   );
-} 
+}
