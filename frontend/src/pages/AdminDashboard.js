@@ -58,6 +58,9 @@ export default function AdminDashboard() {
 
   // Add after other useState imports
   const [pendingStudents, setPendingStudents] = useState([]);
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
+  const [pendingModalResults, setPendingModalResults] = useState([]);
+  const [pendingModalStudent, setPendingModalStudent] = useState(null);
   const [promotionMsg, setPromotionMsg] = useState('');
 
   // Add state for modal
@@ -419,9 +422,24 @@ export default function AdminDashboard() {
         setPendingStudents(pendingStudents.filter(
           s => !(s.student_id === student_id && s.term === term && s.session === session)
         ));
+        setPendingModalOpen(false);
         alert('Results approved!');
       })
       .catch(() => alert('Failed to approve results.'));
+  };
+
+  const viewPendingResults = (student_id, term, session, student) => {
+    axios.get(`http://localhost:5000/api/results?student_id=${student_id}&term=${term}&session=${session}`)
+      .then(res => {
+        setPendingModalResults(res.data);
+        setPendingModalStudent(student);
+        setPendingModalOpen(true);
+      })
+      .catch(() => {
+        setPendingModalResults([]);
+        setPendingModalStudent(student);
+        setPendingModalOpen(true);
+      });
   };
 
   // Handler for promoting a student
@@ -818,7 +836,13 @@ export default function AdminDashboard() {
                       <td className="py-2 px-4">{s.class}</td>
                       <td className="py-2 px-4">{s.term}</td>
                       <td className="py-2 px-4">{s.session}</td>
-                      <td className="py-2 px-4">
+                      <td className="py-2 px-4 flex gap-2">
+                        <button
+                          className="bg-blue-600 hover:bg-blue-800 text-white px-3 py-1 rounded"
+                          onClick={() => viewPendingResults(s.student_id, s.term, s.session, s)}
+                        >
+                          View
+                        </button>
                         <button
                           className="bg-green-600 hover:bg-green-800 text-white px-3 py-1 rounded"
                           onClick={() => approveResults(s.student_id, s.term, s.session)}
@@ -833,6 +857,43 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+        {/* Modal for pending result details */}
+        {pendingModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 relative w-full max-w-xl">
+              <button className="absolute top-2 right-2 text-2xl" onClick={() => setPendingModalOpen(false)}>&times;</button>
+              <h4 className="font-bold mb-4 text-green-700">Pending Results for {pendingModalStudent?.fullname} ({pendingModalStudent?.student_id})</h4>
+              {pendingModalResults.length === 0 ? (
+                <div className="text-red-600">No results found for this student/term/session.</div>
+              ) : (
+                <table className="min-w-full mb-4">
+                  <thead>
+                    <tr>
+                      <th className="py-2 px-4 text-left">Subject</th>
+                      <th className="py-2 px-4 text-left">Score</th>
+                      <th className="py-2 px-4 text-left">Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingModalResults.map((r, idx) => (
+                      <tr key={r.subject + idx}>
+                        <td className="py-2 px-4">{r.subject}</td>
+                        <td className="py-2 px-4">{r.score}</td>
+                        <td className="py-2 px-4">{r.grade}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <button
+                className="bg-green-600 hover:bg-green-800 text-white px-4 py-2 rounded"
+                onClick={() => approveResults(pendingModalStudent.student_id, pendingModalStudent.term, pendingModalStudent.session)}
+              >
+                Approve Results
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
