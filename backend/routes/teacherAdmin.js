@@ -13,11 +13,11 @@ router.get('/teachers', async (req, res) => {
 
 // Add teacher
 router.post('/teachers', async (req, res) => {
-  const { fullname, email, password } = req.body;
+  const { fullname, email, password, session } = req.body;
   const db = await openDb();
   const hashed = await bcrypt.hash(password, 10);
   try {
-    await db.run('INSERT INTO teachers (fullname, email, password) VALUES (?, ?, ?)', [fullname, email, hashed]);
+  await db.run('INSERT INTO teachers (fullname, email, password, session) VALUES (?, ?, ?, ?)', [fullname, email, hashed, session]);
     res.json({ message: 'Teacher added' });
   } catch (e) {
     res.status(400).json({ message: 'Email must be unique' });
@@ -26,14 +26,14 @@ router.post('/teachers', async (req, res) => {
 
 // Edit teacher
 router.put('/teachers/:id', async (req, res) => {
-  const { fullname, email, password } = req.body;
+  const { fullname, email, password, session } = req.body;
   const { id } = req.params;
   const db = await openDb();
   if (password) {
     const hashed = await bcrypt.hash(password, 10);
-    await db.run('UPDATE teachers SET fullname = ?, email = ?, password = ? WHERE id = ?', [fullname, email, hashed, id]);
+  await db.run('UPDATE teachers SET fullname = ?, email = ?, password = ?, session = ? WHERE id = ?', [fullname, email, hashed, session, id]);
   } else {
-    await db.run('UPDATE teachers SET fullname = ?, email = ? WHERE id = ?', [fullname, email, id]);
+  await db.run('UPDATE teachers SET fullname = ?, email = ?, session = ? WHERE id = ?', [fullname, email, session, id]);
   }
   res.json({ message: 'Teacher updated' });
 });

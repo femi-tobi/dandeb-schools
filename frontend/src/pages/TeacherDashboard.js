@@ -288,7 +288,16 @@ export default function TeacherDashboard() {
   };
 
   const TERMS = ['1st Term', '2nd Term', '3rd Term'];
-  const SESSIONS = ['2023/24', '2024/25', '2025/26'];
+  const [sessions, setSessions] = useState([]);
+
+  // Fetch sessions on mount
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/sessions')
+      .then(res => {
+        setSessions(res.data || []);
+      })
+      .catch(() => setSessions([]));
+  }, []);
 
   const handleSaveRemark = async () => {
     if (!remark.trim()) {
@@ -371,7 +380,7 @@ export default function TeacherDashboard() {
                     </select>
                     <select value={session} onChange={e => setSession(e.target.value)} className="border p-2 rounded w-full md:w-32">
                       <option value="">Select Session</option>
-                      {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      {sessions.map(s => <option key={s.id || s.name} value={s.name}>{s.name}</option>)}
                     </select>
                   </div>
                   <table className="min-w-[600px] w-full">

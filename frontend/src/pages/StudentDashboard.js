@@ -13,14 +13,28 @@ const gradeColor = (grade) => {
 };
 
 const TERMS = ['1st Term', '2nd Term', '3rd Term'];
-const SESSIONS = ['2023/24', '2024/25'];
 
 export default function StudentDashboard() {
   const [results, setResults] = useState([]);
   const [student, setStudent] = useState({});
   const [term, setTerm] = useState('2nd Term');
-  const [session, setSession] = useState('2024/25');
+  const [session, setSession] = useState('');
+  const [sessions, setSessions] = useState([]);
   const [teacherRemark, setTeacherRemark] = useState('');
+
+  // Fetch sessions on mount
+  useEffect(() => {
+    axios.get('http://localhost:5000/api/sessions')
+      .then(res => {
+        setSessions(res.data || []);
+        if ((res.data || []).length && !session) {
+          // Default to the last session assuming it's the most recent
+          const last = res.data[res.data.length - 1];
+          if (last?.name) setSession(last.name);
+        }
+      })
+      .catch(() => setSessions([]));
+  }, []);
 
   useEffect(() => {
     // Get student info from localStorage
@@ -28,6 +42,7 @@ export default function StudentDashboard() {
     if (!studentData) return;
     const studentObj = JSON.parse(studentData);
     setStudent(studentObj);
+    if (!session) return;
     axios.get(`http://localhost:5000/api/student/${studentObj.student_id}/result?term=${term}&session=${session}`)
       .then(res => setResults(res.data))
       .catch(err => {
@@ -99,7 +114,7 @@ export default function StudentDashboard() {
         <div className="flex gap-4 mb-6 items-center">
           <label className="font-semibold text-green-800">Session:</label>
           <select value={session} onChange={e => setSession(e.target.value)} className="p-2 rounded border-green-300 border focus:outline-none">
-            {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            {sessions.map(s => <option key={s.id || s.name} value={s.name}>{s.name}</option>)}
           </select>
           <label className="font-semibold text-green-800 ml-4">Term:</label>
           <select value={term} onChange={e => setTerm(e.target.value)} className="p-2 rounded border-green-300 border focus:outline-none">

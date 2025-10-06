@@ -31,12 +31,12 @@ export default function AdminDashboard() {
   // Add/Edit Students state
   const [selectedClass, setSelectedClass] = useState('');
   const [studentsList, setStudentsList] = useState([]);
-  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null });
+  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
   const [studentMsg, setStudentMsg] = useState('');
 
   // Manage Teachers state
   const [teachers, setTeachers] = useState([]);
-  const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', password: '', editId: null });
+  const [teacherForm, setTeacherForm] = useState({ fullname: '', email: '', password: '', editId: null, session: '' });
   const [teacherMsg, setTeacherMsg] = useState('');
   const [assignClasses, setAssignClasses] = useState([]);
   const [assignTeacherId, setAssignTeacherId] = useState(null);
@@ -255,10 +255,11 @@ export default function AdminDashboard() {
       formData.append('student_id', studentForm.student_id);
       formData.append('class', selectedClass);
       formData.append('password', studentForm.password);
+      formData.append('session', studentForm.session);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
       await axios.post('http://localhost:5000/api/admin/students', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student added!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -268,7 +269,7 @@ export default function AdminDashboard() {
   };
 
   const handleEditStudent = (student) => {
-    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null });
+    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null, session: '' });
   };
 
   const handleUpdateStudent = async (e) => {
@@ -280,9 +281,10 @@ export default function AdminDashboard() {
       formData.append('class', selectedClass);
       if (studentForm.password) formData.append('password', studentForm.password);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
+      if (studentForm.session) formData.append('session', studentForm.session);
       await axios.put(`http://localhost:5000/api/admin/students/${studentForm.editId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student updated!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -308,6 +310,7 @@ export default function AdminDashboard() {
           fullname: teacherForm.fullname,
           email: teacherForm.email,
           password: teacherForm.password || undefined,
+          session: teacherForm.session,
         });
         setTeacherMsg('Teacher updated!');
       } else {
@@ -315,10 +318,11 @@ export default function AdminDashboard() {
           fullname: teacherForm.fullname,
           email: teacherForm.email,
           password: teacherForm.password,
+          session: teacherForm.session,
         });
         setTeacherMsg('Teacher added!');
       }
-      setTeacherForm({ fullname: '', email: '', password: '', editId: null });
+      setTeacherForm({ fullname: '', email: '', password: '', editId: null, session: '' });
       const res = await axios.get('http://localhost:5000/api/admin/teachers');
       setTeachers(res.data);
     } catch (err) {
@@ -327,7 +331,7 @@ export default function AdminDashboard() {
   };
 
   const handleEditTeacher = (teacher) => {
-    setTeacherForm({ fullname: teacher.fullname, email: teacher.email, password: '', editId: teacher.id });
+    setTeacherForm({ fullname: teacher.fullname, email: teacher.email, password: '', editId: teacher.id, session: '' });
   };
 
   const handleDeleteTeacher = async (id) => {
@@ -499,7 +503,15 @@ export default function AdminDashboard() {
                     <input type="password" name="password" value={studentForm.password} onChange={handleStudentFormChange} placeholder="Password" className="border p-2 rounded w-full md:w-32" required />
                   )}
                   <input type="file" name="photo" accept="image/*" onChange={e => setStudentForm({ ...studentForm, photo: e.target.files[0] })} className="border p-2 rounded" />
-                  <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">{studentForm.editId ? 'Update' : 'Add'}</button>
+                  <div className="flex gap-2">
+                    <select name="session" value={studentForm.session} onChange={handleStudentFormChange} className="border p-2 rounded w-full md:w-48">
+                      <option value="">Select Session</option>
+                      {sessions.map(s => (
+                        <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                    <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">{studentForm.editId ? 'Update' : 'Add'}</button>
+                  </div>
                   {studentMsg && <span className="text-green-700 ml-2">{studentMsg}</span>}
                 </form>
                 <div className="overflow-x-auto">
@@ -716,7 +728,15 @@ export default function AdminDashboard() {
               <input type="text" name="fullname" value={teacherForm.fullname} onChange={handleTeacherFormChange} placeholder="Full Name" className="border p-2 rounded w-full md:w-48" required />
               <input type="email" name="email" value={teacherForm.email} onChange={handleTeacherFormChange} placeholder="Email" className="border p-2 rounded w-full md:w-48" required />
               <input type="password" name="password" value={teacherForm.password} onChange={handleTeacherFormChange} placeholder={teacherForm.editId ? 'New Password (optional)' : 'Password'} className="border p-2 rounded w-full md:w-48" required={!teacherForm.editId} />
-              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">{teacherForm.editId ? 'Update' : 'Add'}</button>
+              <div className="flex gap-2 w-full flex-wrap">
+                <select name="session" value={teacherForm.session} onChange={handleTeacherFormChange} className="border p-2 rounded w-full md:w-48">
+                  <option value="">Select Session</option>
+                  {sessions.map(s => (
+                    <option key={s.id || s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+                <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">{teacherForm.editId ? 'Update' : 'Add'}</button>
+              </div>
               {teacherMsg && <span className="text-green-700 ml-2">{teacherMsg}</span>}
             </form>
             <div className="overflow-x-auto">
@@ -897,4 +917,4 @@ export default function AdminDashboard() {
       </main>
     </div>
   );
-} 
+}
