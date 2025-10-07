@@ -108,14 +108,14 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   doc.font('Helvetica-Bold').text('   TERM:', { continued: true }).font('Helvetica').text(term, { continued: true });
   doc.font('Helvetica-Bold').text('   SESSION:', { continued: true }).font('Helvetica').text(session);
   // Build maps for previous terms per subject to fill summary columns
-  const termOrder = ['1st Term', '2nd Term', '3rd Term'];
+  const termOrder = ['1st Term', '2nd Term'];
   const currentTermIndex = termOrder.indexOf(term);
   let prev1Map = {}; // First term totals per subject
   let prev2Map = {}; // Second term totals per subject
   try {
     if (currentTermIndex > 0) {
       const firstTermResults = await db.all(
-        'SELECT subject, ca1, ca2, ca3, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        'SELECT subject, ca1, ca2, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
         [student_id, '1st Term', session]
       );
       prev1Map = firstTermResults.reduce((acc, r) => {
@@ -126,7 +126,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     }
     if (currentTermIndex > 1) {
       const secondTermResults = await db.all(
-        'SELECT subject, ca1, ca2, ca3, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        'SELECT subject, ca1, ca2, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
         [student_id, '2nd Term', session]
       );
       prev2Map = secondTermResults.reduce((acc, r) => {
@@ -141,9 +141,8 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
-    const ca3 = Number(r.ca3) || 0;
     const exam = Number(r.score) || 0;
-    return sum + ca1 + ca2 + ca3 + exam;
+    return sum + ca1 + ca2 + exam;
   }, 0);
   const termAverage = results.length ? (grandTotal / results.length).toFixed(2) : '0.00';
   // Calculate real-time cumulative grade based on gradingKey
@@ -178,7 +177,6 @@ router.get('/:student_id/result/pdf', async (req, res) => {
         const sGrandTotal = sResults.reduce((sum, r) => {
           const ca1 = Number(r.ca1) || 0;
           const ca2 = Number(r.ca2) || 0;
-          const ca3 = Number(r.ca3) || 0;
           const exam = Number(r.score) || 0;
           return sum + ca1 + ca2 + ca3 + exam;
         }, 0);
@@ -221,14 +219,13 @@ router.get('/:student_id/result/pdf', async (req, res) => {
 const margin = borderMargin;
 const colWidths = [
   60, // SUBJECTS
-  35, // CA1
-  35, // CA2
-  35, // CA3
-  35, // CA Total
-  35, // Exam
-  35, // Total
-  35, // Grade
-  45, // Remark
+  20, // CA1
+  20, // CA2
+  23, // CA Total
+  25, // Exam
+  13, // Total
+  25, // Grade
+  35, // Remark
   60, // Prev Term 1
   50, // Prev Term 2
   60  // Cumulative
@@ -297,7 +294,7 @@ doc.restore();
 
 // Grouped headers (centered in header area)
 const groupHeaderY = tableStartY + headerRowHeight / 4; // Centered vertically in first header row
-doc.font('Helvetica-Bold').fontSize(9);
+doc.font('Helvetica-Bold').fontSize(8);
 doc.text('SUMMARY OF CONTINUOUS ASSESSMENT TEST', colX[1], groupHeaderY, { width: colX[5] - colX[1], align: 'center' });
 doc.text('SUMMARY OF TERMS WORK', colX[6], groupHeaderY, { width: colX[9] - colX[6], align: 'center' });
 doc.text('PREVIOUS TERMS SUMMARIES', colX[9], groupHeaderY, { width: colX[12] - colX[9], align: 'center' });
@@ -306,21 +303,13 @@ doc.text('PREVIOUS TERMS SUMMARIES', colX[9], groupHeaderY, { width: colX[12] - 
 const caHeaderY = tableStartY + headerRowHeight + headerRowHeight / 4; // Centered vertically in second header row
 doc.font('Helvetica-Bold').fontSize(8);
 doc.text('1ST C.A.', colX[1], caHeaderY, { width: colX[2] - colX[1], align: 'center' });
-doc.font('Helvetica').fontSize(7);
-doc.text('Obtainable = 20%', colX[1], caHeaderY + 10, { width: colX[2] - colX[1], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(8);
+doc.font('Helvetica-Bold').fontSize(7);
 doc.text('2ND C.A.', colX[2], caHeaderY, { width: colX[3] - colX[2], align: 'center' });
+doc.font('Helvetica-Bold').fontSize(7);
+doc.text('TOTAL', colX[3], caHeaderY, { width: colX[4] - colX[3], align: 'center' });
+doc.font('Helvetica-Bold').fontSize(7);
+doc.text('Exams', colX[4], caHeaderY, { width: colX[5] - colX[4], align: 'center' });
 doc.font('Helvetica').fontSize(7);
-doc.text('Obtainable = 10%', colX[2], caHeaderY + 10, { width: colX[3] - colX[2], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(8);
-doc.text('3RD C.A.', colX[3], caHeaderY, { width: colX[4] - colX[3], align: 'center' });
-doc.font('Helvetica').fontSize(7);
-doc.text('Obtainable = 10%', colX[3], caHeaderY + 10, { width: colX[4] - colX[3], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(8);
-doc.text('TOTAL', colX[4], caHeaderY, { width: colX[5] - colX[4], align: 'center' });
-doc.font('Helvetica').fontSize(7);
-doc.text('first, second & third', colX[4], caHeaderY + 10, { width: colX[5] - colX[4], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(8);
 doc.text('FIRST TERM SUMMARY', colX[9], caHeaderY, { width: colX[10] - colX[9], align: 'center' });
 doc.text('SECOND TERM SUMMARY', colX[10], caHeaderY, { width: colX[11] - colX[10], align: 'center' });
 doc.text('CUMULATIVE AVERAGE', colX[11], caHeaderY, { width: colX[12] - colX[11], align: 'center' });
@@ -338,10 +327,9 @@ doc.text('GRADE REMARKS', colX[8], caHeaderY, { width: colX[9] - colX[8], align:
     // Fill CA1, CA2, CA3, Total, Exam, Total, Grade, Remark (dynamic)
     doc.text(r.ca1 ?? '', colX[1], rowY + 5, { width: colX[2] - colX[1], align: 'center' });
     doc.text(r.ca2 ?? '', colX[2], rowY + 5, { width: colX[3] - colX[2], align: 'center' });
-    doc.text(r.ca3 ?? '', colX[3], rowY + 5, { width: colX[4] - colX[3], align: 'center' });
-    const caTotal = (Number(r.ca1) || 0) + (Number(r.ca2) || 0) + (Number(r.ca3) || 0);
-    doc.text(caTotal, colX[4], rowY + 5, { width: colX[5] - colX[4], align: 'center' });
-    doc.text(r.score ?? '', colX[5], rowY + 5, { width: colX[6] - colX[5], align: 'center' });
+    const caTotal = (Number(r.ca1) || 0) + (Number(r.ca2) || 0);
+    doc.text(caTotal, colX[3], rowY + 5, { width: colX[4] - colX[3], align: 'center' });
+    doc.text(r.score ?? '', colX[4], rowY + 5, { width: colX[6] - colX[5], align: 'center' });
     const total = caTotal + (Number(r.score) || 0);
     doc.text(total, colX[6], rowY + 5, { width: colX[7] - colX[6], align: 'center' });
     doc.text(r.grade ?? '', colX[7], rowY + 5, { width: colX[8] - colX[7], align: 'center' });
@@ -376,17 +364,52 @@ doc.text('GRADE REMARKS', colX[8], caHeaderY, { width: colX[9] - colX[8], align:
     }
     rowY += rowHeight;
   });
-  // Draw 'Previous Terms Summaries' table to the right
-  const prevX = colX[9];
-  const prevY = dataStartY; // Start from the first data row
-  // Draw grid for previous terms
-  for (let r = 0; r < 3; r++) {
-    doc.moveTo(prevX, prevY + r * rowHeight).lineTo(colX[11], prevY + r * rowHeight).stroke();
-    doc.moveTo(prevX, prevY + (r + 1) * rowHeight).lineTo(colX[11], prevY + (r + 1) * rowHeight).stroke();
-  }
-  for (let i = 9; i <= 11; i++) {
-    doc.moveTo(colX[i], prevY).lineTo(colX[i], prevY + rowHeight * 3).stroke();
-  }
+
+  // === CLASS SUBJECT STATS (This Term) ===
+  let statsStartY = rowY + 14;
+  try {
+    const classSubjectRows = await db.all(
+      'SELECT subject, ca1, ca2, score FROM results WHERE class = ? AND term = ? AND session = ?',
+      [student.class, term, session]
+    );
+    const subjectToTotals = {};
+    classSubjectRows.forEach(r => {
+      const total = (Number(r.ca1) || 0) + (Number(r.ca2) || 0) + (Number(r.score) || 0);
+      if (!subjectToTotals[r.subject]) subjectToTotals[r.subject] = [];
+      subjectToTotals[r.subject].push(total);
+    });
+    // Header
+    doc.font('Helvetica-Bold').fontSize(10).text('Class Subject Stats (This Term)', colX[0], statsStartY);
+    statsStartY += 14;
+    // 4 columns: Subject | Highest | Lowest | Average (ensure one-line headers)
+    const statsX = [colX[0], colX[3], colX[5], colX[7]];
+    const statsWidths = [colX[3] - colX[0], colX[5] - colX[3], colX[7] - colX[5], colX[9] - colX[7]];
+    const statsRowH = 18;
+    // Header row
+    doc.rect(statsX[0], statsStartY, statsWidths.reduce((a,b)=>a+b,0), statsRowH).stroke();
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Subject', statsX[0], statsStartY + 4, { width: statsWidths[0], align: 'center' });
+    doc.text('Highest', statsX[1], statsStartY + 4, { width: statsWidths[1], align: 'center' });
+    doc.text('Lowest', statsX[2], statsStartY + 4, { width: statsWidths[2], align: 'center' });
+    doc.text('Average', statsX[3], statsStartY + 4, { width: statsWidths[3], align: 'center' });
+    let statsY = statsStartY + statsRowH;
+    doc.font('Helvetica').fontSize(9);
+    Object.keys(subjectToTotals).sort().forEach(subject => {
+      const arr = subjectToTotals[subject];
+      if (!arr || arr.length === 0) return;
+      const highest = Math.max(...arr);
+      const lowest = Math.min(...arr);
+      const avg = (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2);
+      doc.rect(statsX[0], statsY, statsWidths.reduce((a,b)=>a+b,0), statsRowH).stroke();
+      doc.text(subject, statsX[0], statsY + 3, { width: statsWidths[0], align: 'center' });
+      doc.text(String(highest), statsX[1], statsY + 3, { width: statsWidths[1], align: 'center' });
+      doc.text(String(lowest), statsX[2], statsY + 3, { width: statsWidths[2], align: 'center' });
+      doc.text(String(avg), statsX[3], statsY + 3, { width: statsWidths[3], align: 'center' });
+      statsY += statsRowH;
+    });
+    rowY = Math.max(rowY, statsY);
+  } catch {}
+  // (Inline class subject stats now rendered in Subject column)
 
   // === GRAND TOTAL ROW ===
   const grandTotalY = rowY + 10;

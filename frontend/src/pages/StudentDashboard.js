@@ -75,13 +75,12 @@ export default function StudentDashboard() {
     return () => clearInterval(intervalId);
   }, [term, session]);
 
-  // Calculate grand total and average based on all components (CA1+CA2+CA3+Exam)
+  // Calculate grand total and average based on components (CA1+CA2+Exam)
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
-    const ca3 = Number(r.ca3) || 0;
     const exam = Number(r.score) || 0;
-    return sum + ca1 + ca2 + ca3 + exam;
+    return sum + ca1 + ca2 + exam;
   }, 0);
   const average = results.length ? (grandTotal / results.length).toFixed(1) : 0;
   const position = 5; // Placeholder
@@ -173,7 +172,6 @@ export default function StudentDashboard() {
                   <th className="py-2 px-4 text-left text-green-900">Subject</th>
                   <th className="py-2 px-4 text-left text-green-900">CA1</th>
                   <th className="py-2 px-4 text-left text-green-900">CA2</th>
-                  <th className="py-2 px-4 text-left text-green-900">CA3</th>
                   <th className="py-2 px-4 text-left text-green-900">Exam</th>
                   <th className="py-2 px-4 text-left text-green-900">Total</th>
                   <th className="py-2 px-4 text-left text-green-900">Grade</th>
@@ -184,15 +182,13 @@ export default function StudentDashboard() {
                 {results.map((r, i) => {
                   const ca1 = Number(r.ca1) || 0;
                   const ca2 = Number(r.ca2) || 0;
-                  const ca3 = Number(r.ca3) || 0;
                   const exam = Number(r.score) || 0;
-                  const total = ca1 + ca2 + ca3 + exam;
+                  const total = ca1 + ca2 + exam;
                   return (
                     <tr key={r.subject} className={i % 2 === 0 ? 'bg-green-50' : ''}>
                       <td className="py-2 px-4">{r.subject}</td>
                       <td className="py-2 px-4">{r.ca1}</td>
                       <td className="py-2 px-4">{r.ca2}</td>
-                      <td className="py-2 px-4">{r.ca3}</td>
                       <td className="py-2 px-4">{r.score}</td>
                       <td className="py-2 px-4">{total}</td>
                       <td className={`py-2 px-4 ${gradeColor(r.grade)}`}>{r.grade}</td>
