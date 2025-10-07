@@ -1,6 +1,7 @@
 import express from 'express';
 import { openDb } from '../db.js';
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -28,10 +29,18 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ?',
     [student_id, term, session]
   );
-  const student = await db.get('SELECT * FROM students WHERE student_id = ?', [student_id]);
+  const student = (await db.get('SELECT * FROM students WHERE student_id = ?', [student_id])) || { fullname: '', class: '', photo: '' };
 
-  // School logo path (user provided)
-  const logoPath = path.join(__dirname, 'images.jpg');
+  // Resolve school logo path (prefer backend/images.*, fallback to frontend/public/images.*)
+  const candidateLogos = [
+    path.join(__dirname, 'images.jpg'),
+    path.join(__dirname, 'images.png'),
+    path.join(__dirname, '../..', 'frontend', 'public', 'images.jpg'),
+    path.join(__dirname, '../..', 'frontend', 'public', 'images.png')
+  ];
+  const logoPath = candidateLogos.find(p => {
+    try { fs.accessSync(p, fs.constants.R_OK); return true; } catch { return false; }
+  });
 
   // Generate PDF
   const doc = new PDFDocument({ margin: 30, size: 'A4' });
@@ -58,7 +67,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const logoWidth = 40;
   const logoHeight = 40;
   const logoY = borderMargin + 5;
-  try { doc.image(logoPath, borderMargin, logoY, { width: logoWidth }); } catch {}
+  try { if (logoPath) doc.image(logoPath, borderMargin, logoY, { width: logoWidth }); } catch {}
 
   // Calculate y-position for header text so it doesn't overlap the logo
   const headerTextY = logoY + 1;
