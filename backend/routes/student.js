@@ -62,9 +62,10 @@ router.get('/:student_id/result/pdf', async (req, res) => {
 
   // Calculate y-position for header text so it doesn't overlap the logo
   const headerTextY = logoY + 1;
-  doc.fontSize(20).font('Helvetica-Bold').text("BOSOL GOD'S WILL GROUP OF SCHOOLS.", borderMargin, headerTextY, { align: 'center', width: usableWidth });
-  doc.fontSize(9).font('Helvetica').text('46-50, AMOKE ALASELA STREET, ABORU, IYANA-IPAJA, LAGOS STATE', borderMargin, headerTextY + 25, { align: 'center', width: usableWidth });
-  doc.text('Web: www.bosolschools.com  Email: bosolschools1998@gmail.com / bosolschools@yahoo.com  Tel.: 08033280761, 08023056947', borderMargin, headerTextY + 38, { align: 'center', width: usableWidth });
+  doc.fontSize(20).font('Helvetica-Bold').text("DANDEB HIGH SCHOOL.", borderMargin, headerTextY, { align: 'center', width: usableWidth });  
+  doc.fontSize(9).font('Helvetica').text('(THE SEAT OF GOD)', borderMargin, headerTextY + 19, { align: 'center', width: usableWidth });
+  doc.fontSize(9).font('Helvetica').text('59, BAYO OLUFEMI STREET, HERITAGE ESTATE, ABORU, IYANA-IPAJA, LAGOS STATE', borderMargin, headerTextY + 28, { align: 'center', width: usableWidth });
+  doc.text('Web: www.dandebschools.com  Email: dandebhighschool@gmail.com  Tel.: 08150749181, 07082998471', borderMargin, headerTextY + 40, { align: 'center', width: usableWidth });
   doc.fontSize(13).font('Helvetica-Bold').text('END OF FIRST TERM E-DOSSIER SLIP FOR 2024/2025 ACADEMIC SESSION', borderMargin, headerTextY + 55, { align: 'center', width: usableWidth });
   doc.moveTo(borderMargin, headerTextY + 75).lineTo(pageWidth - borderMargin, headerTextY + 75).stroke();
 

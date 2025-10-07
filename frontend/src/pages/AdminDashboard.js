@@ -12,6 +12,12 @@ const NAV_ITEMS = [
 ];
 
 export default function AdminDashboard() {
+
+  useEffect(() => {
+    // ✅ Make the title unique for Admin
+    document.title = 'Admin Dashboard – Dandeb School';
+  }, []);
+
   const [csvFile, setCsvFile] = useState(null);
   const [form, setForm] = useState({
     student_id: '234567',
@@ -196,7 +202,6 @@ export default function AdminDashboard() {
         ...form,
         ca1: form.ca1 || 0,
         ca2: form.ca2 || 0,
-        ca3: form.ca3 || 0,
       });
       setMessage('Result added!');
       setForm({ ...form, subject: '', score: '', grade: '' });
@@ -571,7 +576,6 @@ export default function AdminDashboard() {
                 <input type="text" name="session" value={form.session} onChange={handleFormChange} placeholder="Session" className="w-full p-2 border rounded" />
                 <input type="number" name="ca1" value={form.ca1 || ''} onChange={handleFormChange} placeholder="CA1" className="border p-2 rounded" />
                 <input type="number" name="ca2" value={form.ca2 || ''} onChange={handleFormChange} placeholder="CA2" className="border p-2 rounded" />
-                <input type="number" name="ca3" value={form.ca3 || ''} onChange={handleFormChange} placeholder="CA3" className="border p-2 rounded" />
                 <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">Add Result</button>
               </form>
               {message && <div className="mt-2 text-sm text-green-700">{message}</div>}
@@ -686,7 +690,6 @@ export default function AdminDashboard() {
                   <th className="py-2 px-4 text-left text-green-900">Subject</th>
                   <th className="py-2 px-4 text-left text-green-900">CA1</th>
                   <th className="py-2 px-4 text-left text-green-900">CA2</th>
-                  <th className="py-2 px-4 text-left text-green-900">CA3</th>
                   <th className="py-2 px-4 text-left text-green-900">Exam</th>
                   <th className="py-2 px-4 text-left text-green-900">Total</th>
                   <th className="py-2 px-4 text-left text-green-900">Grade</th>
@@ -702,9 +705,8 @@ export default function AdminDashboard() {
                     <td className="py-2 px-4">{r.subject}</td>
                     <td className="py-2 px-4">{r.ca1}</td>
                     <td className="py-2 px-4">{r.ca2}</td>
-                    <td className="py-2 px-4">{r.ca3}</td>
                     <td className="py-2 px-4">{r.score}</td>
-                    <td className="py-2 px-4">{(Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.ca3 || 0) + Number(r.score || 0))}</td>
+                    <td className="py-2 px-4">{(Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.score || 0))}</td>
                     <td className="py-2 px-4">{r.grade}</td>
                     <td className="py-2 px-4">{r.remark}</td>
                     <td className="py-2 px-4">{r.term}</td>
