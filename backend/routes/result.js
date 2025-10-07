@@ -9,18 +9,42 @@ const upload = multer({ dest: 'uploads/' });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
   const fileRows = [];
+  const selectedClass = req.body.class; // optional; can also be provided per row
   fs.createReadStream(req.file.path)
     .pipe(csv())
     .on('data', (row) => fileRows.push(row))
     .on('end', async () => {
       const db = await openDb();
-      for (const row of fileRows) {
-        await db.run(
-          'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [row.student_id, row.subject, row.ca1 || 0, row.ca2 || 0, row.ca3 || 0, row.score, row.grade, row.term, row.session, row.remark || '', 0]
-        );
+      try {
+        await db.exec('BEGIN');
+        for (const row of fileRows) {
+          const studentId = String(row.student_id || '').trim();
+          const subject = String(row.subject || '').trim();
+          const ca1 = Number(row.ca1 || 0) || 0;
+          const ca2 = Number(row.ca2 || 0) || 0;
+          const ca3 = Number(row.ca3 || 0) || 0;
+          const score = Number(row.score || 0) || 0;
+          const grade = String(row.grade || '').trim();
+          const term = String(row.term || '').trim();
+          const sessionVal = String(row.session || '').trim();
+          const remark = String(row.remark || '').trim();
+          const className = String(row.class || selectedClass || '').trim();
+          if (!studentId || !subject || !term || !sessionVal || !className) {
+            continue; // skip invalid rows
+          }
+          await db.run(
+            'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [studentId, subject, ca1, ca2, ca3, score, grade, term, sessionVal, remark, 1, className]
+          );
+        }
+        await db.exec('COMMIT');
+        res.json({ message: 'Results uploaded' });
+      } catch (e) {
+        try { await db.exec('ROLLBACK'); } catch {}
+        res.status(500).json({ message: 'Error uploading results' });
+      } finally {
+        try { fs.unlinkSync(req.file.path); } catch {}
       }
-      fs.unlinkSync(req.file.path);      res.json({ message: 'Results uploaded' });
     });
 });
 

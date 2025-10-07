@@ -97,6 +97,36 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   doc.text('CLASS:', borderMargin + 5, y + 5, { continued: true }).font('Helvetica').text(student.class, { continued: true });
   doc.font('Helvetica-Bold').text('   TERM:', { continued: true }).font('Helvetica').text(term, { continued: true });
   doc.font('Helvetica-Bold').text('   SESSION:', { continued: true }).font('Helvetica').text(session);
+  // Build maps for previous terms per subject to fill summary columns
+  const termOrder = ['1st Term', '2nd Term', '3rd Term'];
+  const currentTermIndex = termOrder.indexOf(term);
+  let prev1Map = {}; // First term totals per subject
+  let prev2Map = {}; // Second term totals per subject
+  try {
+    if (currentTermIndex > 0) {
+      const firstTermResults = await db.all(
+        'SELECT subject, ca1, ca2, ca3, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        [student_id, '1st Term', session]
+      );
+      prev1Map = firstTermResults.reduce((acc, r) => {
+        const total = (Number(r.ca1) || 0) + (Number(r.ca2) || 0) + (Number(r.ca3) || 0) + (Number(r.score) || 0);
+        acc[r.subject] = total;
+        return acc;
+      }, {});
+    }
+    if (currentTermIndex > 1) {
+      const secondTermResults = await db.all(
+        'SELECT subject, ca1, ca2, ca3, score FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        [student_id, '2nd Term', session]
+      );
+      prev2Map = secondTermResults.reduce((acc, r) => {
+        const total = (Number(r.ca1) || 0) + (Number(r.ca2) || 0) + (Number(r.ca3) || 0) + (Number(r.score) || 0);
+        acc[r.subject] = total;
+        return acc;
+      }, {});
+    }
+  } catch {}
+
   // Calculate grand total and term average ONCE for use throughout the PDF
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
@@ -306,6 +336,34 @@ doc.text('GRADE REMARKS', colX[8], caHeaderY, { width: colX[9] - colX[8], align:
     doc.text(total, colX[6], rowY + 5, { width: colX[7] - colX[6], align: 'center' });
     doc.text(r.grade ?? '', colX[7], rowY + 5, { width: colX[8] - colX[7], align: 'center' });
     doc.text(r.remark ?? '', colX[8], rowY + 5, { width: colX[9] - colX[8], align: 'center' });
+
+    // Previous term summaries per subject
+    const firstTermTotal = prev1Map[r.subject];
+    const secondTermTotal = prev2Map[r.subject];
+    // First term column: only show when current term >= 2nd
+    if (currentTermIndex >= 1 && firstTermTotal !== undefined) {
+      doc.text(String(firstTermTotal), colX[9], rowY + 5, { width: colX[10] - colX[9], align: 'center' });
+    }
+    // Second term column: only show when current term is 3rd
+    if (currentTermIndex >= 2 && secondTermTotal !== undefined) {
+      doc.text(String(secondTermTotal), colX[10], rowY + 5, { width: colX[11] - colX[10], align: 'center' });
+    }
+    // Cumulative average column: average of available term totals up to current term
+    let cumulativeTerms = [];
+    if (currentTermIndex === 0) {
+      cumulativeTerms = []; // leave blank for first term as requested focus is for 2nd/3rd
+    } else if (currentTermIndex === 1) {
+      if (firstTermTotal !== undefined) cumulativeTerms.push(firstTermTotal);
+      cumulativeTerms.push(total);
+    } else if (currentTermIndex === 2) {
+      if (firstTermTotal !== undefined) cumulativeTerms.push(firstTermTotal);
+      if (secondTermTotal !== undefined) cumulativeTerms.push(secondTermTotal);
+      cumulativeTerms.push(total);
+    }
+    if (cumulativeTerms.length > 0) {
+      const cumAvg = Math.round((cumulativeTerms.reduce((a, b) => a + b, 0) / cumulativeTerms.length));
+      doc.text(String(cumAvg), colX[11], rowY + 5, { width: colX[12] - colX[11], align: 'center' });
+    }
     rowY += rowHeight;
   });
   // Draw 'Previous Terms Summaries' table to the right

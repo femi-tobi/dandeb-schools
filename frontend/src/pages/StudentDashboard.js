@@ -62,6 +62,19 @@ export default function StudentDashboard() {
       .catch(() => setTeacherRemark(''));
   }, [term, session]);
 
+  // Poll for teacher remark periodically to reflect real-time updates
+  useEffect(() => {
+    const studentData = localStorage.getItem('student');
+    if (!studentData || !session) return;
+    const studentObj = JSON.parse(studentData);
+    const intervalId = setInterval(() => {
+      axios.get(`http://localhost:5000/api/remarks?student_id=${studentObj.student_id}&class=${studentObj.class}&term=${term}&session=${session}`)
+        .then(res => setTeacherRemark(res.data?.remark || ''))
+        .catch(() => {});
+    }, 4000);
+    return () => clearInterval(intervalId);
+  }, [term, session]);
+
   // Calculate grand total and average based on all components (CA1+CA2+CA3+Exam)
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
@@ -139,6 +152,12 @@ export default function StudentDashboard() {
             <div className="text-green-700 text-xs">Remark</div>
             <div className="text-2xl font-bold text-green-900">{remark}</div>
           </div>
+        </div>
+
+        {/* Class Teacher's Remark */}
+        <div className="bg-white rounded shadow p-4 mb-6">
+          <div className="text-green-800 font-semibold mb-2">Class Teacher's Remark</div>
+          <div className="text-green-900 whitespace-pre-wrap">{teacherRemark || '—'}</div>
         </div>
 
         {/* Results Table */}
