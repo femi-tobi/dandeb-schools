@@ -89,6 +89,22 @@ export default function StudentDashboard() {
   // Avatar initials
   const initials = student.fullname ? student.fullname.split(' ').map(n => n[0]).join('').toUpperCase() : '';
 
+  // Resolve student photo URL for img src. Handles paths like:
+  // - 'backend/uploads/photos/...' (stored by multer on Windows)
+  // - 'uploads/photos/...' (already relative)
+  // - '/uploads/photos/...' (leading slash)
+  // - absolute URLs
+  const resolvePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    const trimmed = String(photoPath).trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    // Remove any leading 'backend/' segment which some endpoints store
+    let p = trimmed.replace(/^backend\//, '');
+    // Ensure no leading slash duplication
+    if (p.startsWith('/')) p = p.slice(1);
+    return `http://localhost:5000/${p}`;
+  };
+
   // Debug log for results
   console.log('Student results:', results);
 
@@ -99,8 +115,9 @@ export default function StudentDashboard() {
         <div className="flex items-center gap-4">
           {student.photo ? (
             <img
-              src={`http://localhost:5000/${student.photo.replace('backend/', '')}`}
+              src={resolvePhotoUrl(student.photo)}
               alt="Passport"
+              onError={(e) => { e.target.onerror = null; e.target.src = '/images.jpg'; }}
               className="w-16 h-16 rounded object-cover border-2 border-green-300 bg-white"
             />
           ) : (

@@ -49,6 +49,7 @@ export default function AdminDashboard() {
 
   // Manage Subjects state
   const [subjects, setSubjects] = useState([]);
+  const [uploadStudents, setUploadStudents] = useState([]); // students for the upload/manual form
   const [newSubject, setNewSubject] = useState('');
   const [subjectMsg, setSubjectMsg] = useState('');
 
@@ -114,12 +115,23 @@ export default function AdminDashboard() {
 
   // Fetch subjects on mount or when panel is active
   useEffect(() => {
-    if (activePanel === 'subjects') {
+    if (activePanel === 'subjects' || activePanel === 'upload') {
       axios.get('http://localhost:5000/api/subjects')
         .then(res => setSubjects(res.data))
         .catch(() => setSubjects([]));
     }
   }, [activePanel]);
+
+  // Fetch students for the manual upload form when the selected class in the form changes
+  useEffect(() => {
+    if (!form.class) {
+      setUploadStudents([]);
+      return;
+    }
+    axios.get(`http://localhost:5000/api/admin/students?class=${form.class}`)
+      .then(res => setUploadStudents(res.data))
+      .catch(() => setUploadStudents([]));
+  }, [form.class]);
 
   // Fetch sessions on mount
   useEffect(() => {
@@ -562,20 +574,35 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="bg-white rounded shadow p-6 max-w-xl">
-              <h3 className="font-bold mb-2 text-green-700">Add Dummy Result (Manual Entry)</h3>
+              <h3 className="font-bold mb-2 text-green-700">Manual Result Entry</h3>
               <form onSubmit={handleFormSubmit} className="flex flex-col gap-2">
                 <select name="class" value={form.class} onChange={handleFormChange} className="border p-2 rounded w-full" required>
                   <option value="">Select Class</option>
                   {classes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                 </select>
-                <input type="text" name="student_id" value={form.student_id} readOnly className="w-full p-2 border rounded bg-gray-100" />
-                <input type="text" name="subject" value={form.subject} onChange={handleFormChange} placeholder="Subject" className="w-full p-2 border rounded" required />
-                <input type="number" name="score" value={form.score} onChange={handleFormChange} placeholder="Score" className="w-full p-2 border rounded" required />
+                {/* Student dropdown populated when a class is selected */}
+                <select name="student_id" value={form.student_id} onChange={handleFormChange} className="border p-2 rounded w-full" required>
+                  <option value="">Select Student</option>
+                  {uploadStudents.map(s => (
+                    <option key={s.student_id} value={s.student_id}>{s.student_id} - {s.fullname}</option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" name="ca1" value={form.ca1 || ''} onChange={handleFormChange} placeholder="CA1" className="border p-2 rounded" />
+                  <input type="number" name="ca2" value={form.ca2 || ''} onChange={handleFormChange} placeholder="CA2" className="border p-2 rounded" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" name="score" value={form.score} onChange={handleFormChange} placeholder="Exam Score" className="w-full p-2 border rounded" required />
+                  <select name="subject" value={form.subject} onChange={handleFormChange} className="border p-2 rounded w-full" required>
+                    <option value="">Select Subject</option>
+                    {subjects.map(sub => (
+                      <option key={sub.id || sub.name} value={sub.name}>{sub.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <input type="text" name="grade" value={form.grade} onChange={handleFormChange} placeholder="Grade (A/B/C/D/F)" className="w-full p-2 border rounded" required />
                 <input type="text" name="term" value={form.term} onChange={handleFormChange} placeholder="Term" className="w-full p-2 border rounded" />
                 <input type="text" name="session" value={form.session} onChange={handleFormChange} placeholder="Session" className="w-full p-2 border rounded" />
-                <input type="number" name="ca1" value={form.ca1 || ''} onChange={handleFormChange} placeholder="CA1" className="border p-2 rounded" />
-                <input type="number" name="ca2" value={form.ca2 || ''} onChange={handleFormChange} placeholder="CA2" className="border p-2 rounded" />
                 <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold w-full md:w-auto">Add Result</button>
               </form>
               {message && <div className="mt-2 text-sm text-green-700">{message}</div>}

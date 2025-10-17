@@ -31,13 +31,16 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   );
   const student = (await db.get('SELECT * FROM students WHERE student_id = ?', [student_id])) || { fullname: '', class: '', photo: '', gender: '', dob: '', admission_no: '' };
 
-  // Resolve school logo path (prefer backend/images.*, fallback to frontend/public/images.*)
-  const candidateLogos = [
-    path.join(__dirname, 'images.jpg'),
-    path.join(__dirname, 'images.png'),
-    path.join(__dirname, '../..', 'frontend', 'public', 'images.jpg'),
-    path.join(__dirname, '../..', 'frontend', 'public', 'images.png')
-  ];
+  // Resolve school logo path.
+  // Prefer environment-configured path (useful when you update the logo without changing files in the repo),
+  // then prefer backend images, then frontend public images.
+  const envLogo = process.env.SCHOOL_LOGO_PATH;
+  const candidateLogos = [];
+  if (envLogo) candidateLogos.push(envLogo);
+  candidateLogos.push(path.join(__dirname, 'images.jpg'));
+  candidateLogos.push(path.join(__dirname, 'images.png'));
+  candidateLogos.push(path.join(__dirname, '../..', 'frontend', 'public', 'images.jpg'));
+  candidateLogos.push(path.join(__dirname, '../..', 'frontend', 'public', 'images.png'));
   const logoPath = candidateLogos.find(p => {
     try { fs.accessSync(p, fs.constants.R_OK); return true; } catch { return false; }
   });
@@ -47,16 +50,24 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   doc.pipe(res);
 
-  // Add watermark logo before any other drawing
-  doc.save();
-  doc.opacity(0.10); // Set low opacity for watermark
-  const watermarkWidth = 300; // Adjust as needed
-  const watermarkHeight = 300; // Adjust as needed
-  const centerX = (doc.page.width - watermarkWidth) / 2;
-  const centerY = (doc.page.height - watermarkHeight) / 2;
-  doc.image(logoPath, centerX, centerY, { width: watermarkWidth, height: watermarkHeight });
-  doc.opacity(1); // Reset opacity for normal drawing
-  doc.restore();
+  // Add watermark logo before any other drawing (if available)
+  try {
+    if (logoPath) {
+      doc.save();
+      doc.opacity(0.10); // Set low opacity for watermark
+      const watermarkWidth = Math.min(400, doc.page.width - 100);
+      const watermarkHeight = watermarkWidth; // square watermark
+      const centerX = (doc.page.width - watermarkWidth) / 2;
+      const centerY = (doc.page.height - watermarkHeight) / 2;
+      doc.image(logoPath, centerX, centerY, { width: watermarkWidth, height: watermarkHeight });
+      doc.opacity(1); // Reset opacity for normal drawing
+      doc.restore();
+    }
+  } catch (e) {
+    // If watermark failed for any reason, continue without it
+    console.error('Failed to draw watermark logo:', e && e.message);
+    try { doc.opacity(1); doc.restore(); } catch (e) {}
+  }
 
   // Set up border margin and usable width
   const borderMargin = 20;
@@ -67,7 +78,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const logoWidth = 40;
   const logoHeight = 40;
   const logoY = borderMargin + 5;
-  try { if (logoPath) doc.image(logoPath, borderMargin, logoY, { width: logoWidth }); } catch {}
+  try { if (logoPath) doc.image(logoPath, borderMargin, logoY, { width: logoWidth }); } catch (e) { console.error('Failed to draw header logo:', e && e.message); }
 
   // Calculate y-position for header text so it doesn't overlap the logo
   const headerTextY = logoY + 1;
@@ -92,13 +103,34 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   // Row 1: Student Name with Passport
   doc.fontSize(11).font('Helvetica-Bold');
   doc.text('STUDENT NAME:', borderMargin + 5, y + 5, { continued: true }).font('Helvetica').text(student.fullname);
-  const passportBoxX = borderMargin + usableWidth - 30;
+  // Passport box: make larger and draw student photo if available
+  const passportBoxWidth = 60;
+  const passportBoxHeight = 60
+  const passportBoxX = borderMargin + usableWidth - passportBoxWidth - 10;
   const passportBoxY = y;
-  doc.rect(passportBoxX, passportBoxY, 20, 20).stroke();
+  // Draw outer rectangle for passport area
+  doc.rect(passportBoxX, passportBoxY, passportBoxWidth, passportBoxHeight).stroke();
   if (student.photo) {
     try {
-      doc.image(student.photo, passportBoxX, y, { width: 20, height: 20 });
-    } catch {}
+      // If photo path is relative to backend, it should work; otherwise try to resolve common patterns
+      let photoPath = student.photo;
+      // Ensure same forward slashes for path resolution
+      photoPath = photoPath.replace(/\\/g, '/');
+      // If path is a frontend-served path like 'frontend/uploads/...', try to map it to backend
+      if (!fs.existsSync(photoPath)) {
+        const alt = path.join(__dirname, '..', student.photo);
+        if (fs.existsSync(alt)) photoPath = alt;
+      }
+      // Draw the image centered in the passport box while preserving aspect ratio
+      const maxW = passportBoxWidth - 6;
+      const maxH = passportBoxHeight - 6;
+      doc.image(photoPath, passportBoxX + 3, passportBoxY + 3, { fit: [maxW, maxH], align: 'center', valign: 'center' });
+    } catch (e) {
+      console.error('Failed to draw student photo:', e && e.message);
+    }
+  } else {
+    // If no photo, write a small label inside the empty passport box
+    doc.fontSize(8).font('Helvetica').text('Passport\nPhoto', passportBoxX + 6, passportBoxY + passportBoxHeight / 2 - 8, { width: passportBoxWidth - 12, align: 'center' });
   }
   y += 20;
 
@@ -228,7 +260,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
 // === MAIN RESULT TABLE ===
 const margin = borderMargin;
 const colWidths = [
-  60, // SUBJECTS
+  90, // SUBJECTS
   20, // CA1
   20, // CA2
   23, // CA Total

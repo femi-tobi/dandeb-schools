@@ -40,6 +40,57 @@ export default function TeacherDashboard() {
   const [historyResults, setHistoryResults] = useState([]);
   const [remark, setRemark] = useState('');
   const [remarkMsg, setRemarkMsg] = useState('');
+  const [gradeScores, setGradeScores] = useState({});
+
+  // Grade mapping function - returns grade code given a numeric percentage/total
+  const getGrade = (percent) => {
+    let p = parseFloat(String(percent).trim());
+    if (Number.isNaN(p)) return '';
+    // if value looks like a fraction (0.9) assume it's a 0-1 ratio and convert to percentage
+    if (p > 0 && p <= 1) p = p * 100;
+    // round to nearest integer and clamp to 0-100
+    p = Math.round(p);
+    if (p < 0) p = 0;
+    if (p > 100) p = 100;
+    console.debug('[getGrade] input:', percent, 'normalizedInt:', p);
+    // explicit integer ranges (inclusive)
+    if (p >= 75 && p <= 100) return 'A1';
+    if (p >= 70 && p <= 74) return 'B2';
+    if (p >= 65 && p <= 69) return 'B3';
+    if (p >= 60 && p <= 64) return 'C6';
+    if (p >= 55 && p <= 59) return 'D7';
+    if (p >= 50 && p <= 54) return 'E8';
+    return 'F9';
+  };
+
+  // Handlers that update CA/Exam and compute grade for the student immediately
+  const handleCaChange = (studentId, value) => {
+    setCaScores(prev => {
+      const next = { ...prev, [studentId]: value };
+      const ca = Number(next[studentId] || 0);
+      const exam = Number(examScores[studentId] || 0);
+      const total = (isNaN(ca) ? 0 : ca) + (isNaN(exam) ? 0 : exam);
+      const totalInt = Math.round(total);
+      const grade = total === 0 && value === '' && (examScores[studentId] === '' || examScores[studentId] === undefined) ? '' : getGrade(totalInt);
+      console.debug('[handleCaChange] student:', studentId, 'ca:', ca, 'exam:', exam, 'total:', total, 'grade:', grade);
+      setGradeScores(gPrev => ({ ...gPrev, [studentId]: grade }));
+      return next;
+    });
+  };
+
+  const handleExamChange = (studentId, value) => {
+    setExamScores(prev => {
+      const next = { ...prev, [studentId]: value };
+      const ca = Number(caScores[studentId] || 0);
+      const exam = Number(next[studentId] || 0);
+      const total = (isNaN(ca) ? 0 : ca) + (isNaN(exam) ? 0 : exam);
+      const totalInt = Math.round(total);
+      const grade = total === 0 && value === '' && (caScores[studentId] === '' || caScores[studentId] === undefined) ? '' : getGrade(totalInt);
+      console.debug('[handleExamChange] student:', studentId, 'ca:', ca, 'exam:', exam, 'total:', total, 'grade:', grade);
+      setGradeScores(gPrev => ({ ...gPrev, [studentId]: grade }));
+      return next;
+    });
+  };
 
   
 
@@ -129,17 +180,20 @@ export default function TeacherDashboard() {
       setResultMsg('Please select subject, term, and session.');
       return;
     }
-    const { score, grade } = resultInputs[student_id] || {};
-    if (!score || !grade) {
+    const { score } = resultInputs[student_id] || {};
+    // prefer computed grade from gradeScores, fallback to manual input
+    const computedGrade = gradeScores[student_id] || (resultInputs[student_id] && resultInputs[student_id].grade) || '';
+    if (!score || !computedGrade) {
       setResultMsg('Score and grade are required.');
       return;
     }
     try {
+      console.debug('[handleResultSubmit] posting result for', student_id, { subject, score, grade: computedGrade, term, session, class: selectedClass });
       await axios.post('http://localhost:5000/api/results/manual', {
         student_id,
         subject,
         score,
-        grade,
+        grade: computedGrade,
         term,
         session,
         class: selectedClass
@@ -228,13 +282,20 @@ export default function TeacherDashboard() {
     }
     try {
       for (const row of batchResults) {
+        // compute fallback grade in case it's missing
+        const ca1 = Number(row.ca1 || 0);
+        const ca2 = Number(row.ca2 || 0);
+        const exam = Number(row.exam || 0);
+        const total = (isNaN(ca1) ? 0 : ca1) + (isNaN(ca2) ? 0 : ca2) + (isNaN(exam) ? 0 : exam);
+        const gradeToSend = row.grade || getGrade(total);
+        console.debug('[handleSubmitBatchResults] posting row for', modalStudent.student_id, { subject: row.subject, ca1, ca2, exam, total, grade: gradeToSend, term, session, class: selectedClass });
         await axios.post('http://localhost:5000/api/results/manual', {
           student_id: modalStudent.student_id,
           subject: row.subject,
-          ca1: row.ca1 || 0,
-          ca2: row.ca2 || 0,
-          score: row.exam || 0,
-          grade: row.grade,
+          ca1: ca1,
+          ca2: ca2,
+          score: exam,
+          grade: gradeToSend,
           remark: row.remark,
           term,
           session,
@@ -388,7 +449,7 @@ export default function TeacherDashboard() {
                               <input
                                 type="number"
                                 value={ca}
-                                onChange={e => setCaScores(prev => ({ ...prev, [s.student_id]: e.target.value }))}
+                                onChange={e => handleCaChange(s.student_id, e.target.value)}
                                 className="border p-1 rounded w-full md:w-20"
                               />
                             </td>
@@ -396,7 +457,7 @@ export default function TeacherDashboard() {
                               <input
                                 type="number"
                                 value={exam}
-                                onChange={e => setExamScores(prev => ({ ...prev, [s.student_id]: e.target.value }))}
+                                onChange={e => handleExamChange(s.student_id, e.target.value)}
                                 className="border p-1 rounded w-full md:w-20"
                               />
                             </td>
@@ -407,6 +468,7 @@ export default function TeacherDashboard() {
                                 readOnly
                                 className="border p-1 rounded w-full md:w-20 bg-gray-100"
                               />
+                              <div className="text-sm text-green-800 mt-1">{gradeScores[s.student_id] || ''} {total !== '' ? `(${total})` : ''}</div>
                             </td>
                             <td className="py-2 px-2 md:px-4">
                               <button className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded w-full md:w-auto" onClick={() => openStudentModal(s)}>View/Add Results</button>
@@ -481,13 +543,13 @@ export default function TeacherDashboard() {
                               </select>
                             </td>
                             <td className="py-2 px-2 md:px-4">
-                              <input type="number" value={row.ca1 || ''} onChange={e => handleBatchRowChange(idx, 'ca1', e.target.value)} className="border p-2 rounded w-full md:w-16" />
+                              <input type="number" value={row.ca1 || ''} onChange={e => { handleBatchRowChange(idx, 'ca1', e.target.value); /* compute grade for batch row */ const ca = Number((e.target.value) || 0); const ex = Number(row.exam || 0); const tot = (isNaN(ca) ? 0 : ca) + (isNaN(ex) ? 0 : ex); const totInt = Math.round(tot); handleBatchRowChange(idx, 'grade', tot === 0 && e.target.value === '' && (row.exam === '' || row.exam === undefined) ? '' : getGrade(totInt)); }} className="border p-2 rounded w-full md:w-16" />
                             </td>
                             <td className="py-2 px-2 md:px-4">
                               <input type="number" value={row.ca2 || ''} onChange={e => handleBatchRowChange(idx, 'ca2', e.target.value)} className="border p-2 rounded w-full md:w-16" />
                             </td>
                             <td className="py-2 px-2 md:px-4">
-                              <input type="number" value={row.exam || ''} onChange={e => handleBatchRowChange(idx, 'exam', e.target.value)} className="border p-2 rounded w-full md:w-16" />
+                              <input type="number" value={row.exam || ''} onChange={e => { handleBatchRowChange(idx, 'exam', e.target.value); const ca = Number(row.ca1 || 0); const ex = Number(e.target.value || 0); const tot = (isNaN(ca) ? 0 : ca) + (isNaN(ex) ? 0 : ex); const totInt = Math.round(tot); handleBatchRowChange(idx, 'grade', tot === 0 && e.target.value === '' && (row.ca1 === '' || row.ca1 === undefined) ? '' : getGrade(totInt)); }} className="border p-2 rounded w-full md:w-16" />
                             </td>
                             <td className="py-2 px-2 md:px-4">
                               <input type="number" value={(Number(row.ca1 || 0) + Number(row.ca2 || 0) + Number(row.exam || 0)) || ''} readOnly className="border p-2 rounded w-full md:w-16 bg-gray-100" />
