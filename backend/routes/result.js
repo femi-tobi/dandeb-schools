@@ -1,6 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import csv from 'csv-parser';
 import fs from 'fs';
 import { openDb } from '../db.js';
 
@@ -8,44 +7,152 @@ const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
-  const fileRows = [];
-  const selectedClass = req.body.class; // optional; can also be provided per row
-  fs.createReadStream(req.file.path)
-    .pipe(csv())
-    .on('data', (row) => fileRows.push(row))
-    .on('end', async () => {
-      const db = await openDb();
-      try {
-        await db.exec('BEGIN');
-        for (const row of fileRows) {
-          const studentId = String(row.student_id || '').trim();
-          const subject = String(row.subject || '').trim();
-          const ca1 = Number(row.ca1 || 0) || 0;
-          const ca2 = Number(row.ca2 || 0) || 0;
-          const ca3 = Number(row.ca3 || 0) || 0;
-          const score = Number(row.score || 0) || 0;
-          const grade = String(row.grade || '').trim();
-          const term = String(row.term || '').trim();
-          const sessionVal = String(row.session || '').trim();
-          const remark = String(row.remark || '').trim();
-          const className = String(row.class || selectedClass || '').trim();
-          if (!studentId || !subject || !term || !sessionVal || !className) {
-            continue; // skip invalid rows
-          }
-          await db.run(
-            'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [studentId, subject, ca1, ca2, ca3, score, grade, term, sessionVal, remark, 1, className]
-          );
-        }
-        await db.exec('COMMIT');
-        res.json({ message: 'Results uploaded' });
-      } catch (e) {
-        try { await db.exec('ROLLBACK'); } catch {}
-        res.status(500).json({ message: 'Error uploading results' });
-      } finally {
-        try { fs.unlinkSync(req.file.path); } catch {}
+  // Expect term and session to be provided by admin before upload
+  const providedTerm = String(req.body.term || '').trim();
+  const providedSession = String(req.body.session || '').trim();
+  const defaultClass = String(req.body.class || '').trim();
+  if (!providedTerm || !providedSession) {
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+    return res.status(400).json({ message: 'Please provide term and session before uploading.' });
+  }
+
+  const raw = fs.readFileSync(req.file.path, 'utf8');
+  const lines = raw.split(/\r?\n/).map(l => l.split(',').map(c => (c || '').trim()));
+  // find header row and weights row (scan first 12 rows)
+  let headerRowIdx = -1;
+  let weightsRowIdx = -1;
+  for (let i = 0; i < Math.min(12, lines.length - 1); i++) {
+    const row = lines[i];
+    const next = lines[i + 1] || [];
+    const hasText = row.some(cell => cell && /[A-Za-z]/.test(cell));
+    const numericCount = next.filter(cell => cell !== '' && !Number.isNaN(Number(cell))).length;
+    if (hasText && numericCount >= 6) { // heuristic: weights row contains many numeric weight entries
+      headerRowIdx = i;
+      weightsRowIdx = i + 1;
+      break;
+    }
+  }
+
+  if (headerRowIdx === -1) {
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+    return res.status(400).json({ message: 'Could not detect subject header rows in CSV. Ensure subject names are in a header row and weights in the row below.' });
+  }
+
+  const headerRow = lines[headerRowIdx];
+  // Build subject blocks starting from column index 3 (0-based)
+  const subjectBlocks = [];
+  let col = 3; // col 0 = name, col1 = seat, col2 = class
+  while (col < headerRow.length) {
+    const name = (headerRow[col] || '').trim();
+    // If header cell empty but we still have a numeric weights row, try to use earlier non-empty header in this 4-col block
+    if (!name) {
+      // try to find preceding non-empty within this 4-col window
+      const back = Math.max(0, col - 3);
+      let found = '';
+      for (let k = back; k < col; k++) { if (headerRow[k]) { found = headerRow[k]; break; } }
+      if (found) {
+        subjectBlocks.push({ name: found, start: col });
+      } else {
+        // if totally empty, break to avoid infinite loop
+        // but still advance
+        // do not push
       }
-    });
+    } else {
+      subjectBlocks.push({ name, start: col });
+    }
+    col += 4; // assume block size of 4: CA1, CA2, Exam, Total
+  }
+
+  const db = await openDb();
+  const inserted = [];
+  const skipped = [];
+  const unmatched = [];
+  try {
+    await db.exec('BEGIN');
+    // iterate over student rows after the weights row
+    for (let r = weightsRowIdx + 1; r < lines.length; r++) {
+      const row = lines[r];
+      if (!row || row.length === 0) continue;
+      const name = (row[0] || '').trim();
+      if (!name) continue; // skip blank rows
+      const seat = (row[1] || '').trim();
+      const classFromRow = (row[2] || '').trim() || defaultClass;
+
+      // Map name to student_id
+      let student = null;
+      if (name) {
+        student = await db.get('SELECT * FROM students WHERE LOWER(TRIM(fullname)) = LOWER(TRIM(?)) LIMIT 1', [name]);
+      }
+      if (!student && seat) {
+        // try lookup by student_id or seat number match
+        student = await db.get('SELECT * FROM students WHERE student_id = ? LIMIT 1', [seat]);
+      }
+      if (!student && classFromRow) {
+        // try fuzzy match by name and class
+        student = await db.get('SELECT * FROM students WHERE LOWER(TRIM(fullname)) LIKE LOWER(TRIM(?)) AND class = ? LIMIT 1', [name + '%', classFromRow]);
+      }
+
+      if (!student) {
+        unmatched.push({ row: r + 1, name, class: classFromRow });
+        // still attempt to parse subjects but we cannot save without student_id
+        continue;
+      }
+
+      const studentId = student.student_id;
+
+      for (const sb of subjectBlocks) {
+        const sName = sb.name;
+        const start = sb.start;
+        const ca1 = (row[start] || '').trim();
+        const ca2 = (row[start + 1] || '').trim();
+        const exam = (row[start + 2] || '').trim();
+        // if no scores at all, skip
+        if (!ca1 && !ca2 && !exam) continue;
+
+        const ca1Num = ca1 === '' ? null : Number(ca1);
+        const ca2Num = ca2 === '' ? null : Number(ca2);
+        const examNum = exam === '' ? null : Number(exam);
+        const term = providedTerm;
+        const session = providedSession;
+        const className = classFromRow || defaultClass || '';
+        // compute total and grade if numeric values present
+        const total = (Number(ca1Num || 0) + Number(ca2Num || 0) + Number(examNum || 0));
+        const gradeVal = (total > 0) ? (() => {
+          let p = Math.round(total);
+          if (p < 0) p = 0; if (p > 100) p = 100;
+          if (p >= 75) return 'A1';
+          if (p >= 70) return 'B2';
+          if (p >= 65) return 'B3';
+          if (p >= 60) return 'C6';
+          if (p >= 55) return 'D7';
+          if (p >= 50) return 'E8';
+          return 'F9';
+        })() : null;
+
+        await db.run(
+          'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [studentId, sName, ca1Num, ca2Num, null, examNum, gradeVal, term, session, '', 0, className]
+        );
+        inserted.push({ row: r + 1, student: studentId, subject: sName });
+      }
+    }
+
+    await db.exec('COMMIT');
+    // write unmatched rows to a CSV for admin review
+    if (unmatched.length) {
+      const outPath = `uploads/unmatched-${Date.now()}.csv`;
+      const csvOut = ['row,name,class'].concat(unmatched.map(u => `${u.row},"${u.name}",${u.class}`)).join('\n');
+      try { fs.writeFileSync(outPath, csvOut, 'utf8'); } catch (e) {}
+    }
+
+    res.json({ message: 'Results processed', inserted: inserted.length, skipped: skipped.length, unmatchedCount: unmatched.length });
+  } catch (e) {
+    try { await db.exec('ROLLBACK'); } catch (err) {}
+    console.error('Upload error', e);
+    res.status(500).json({ message: 'Error processing CSV upload' });
+  } finally {
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+  }
 });
 
 // Insert or update (upsert) a manual result. Partial fields allowed (e.g., only ca1).
