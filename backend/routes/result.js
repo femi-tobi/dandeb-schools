@@ -48,17 +48,94 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     });
 });
 
+// Insert or update (upsert) a manual result. Partial fields allowed (e.g., only ca1).
 router.post('/manual', async (req, res) => {
-  const { student_id, subject, ca1 = 0, ca2 = 0, ca3 = 0, score, grade, term, session, remark = '', class: className } = req.body;
+  const {
+    student_id,
+    subject,
+    ca1 = null,
+    ca2 = null,
+    ca3 = null,
+    score = null,
+    grade = null,
+    term,
+    session,
+    remark = '',
+    class: className
+  } = req.body;
+
   if (!student_id || !subject || !term || !session || !className) {
     return res.status(400).json({ message: 'student_id, subject, term, session, and class are required.' });
   }
+
   const db = await openDb();
-  await db.run(
-    'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, 0, className]
-  );
-  res.json({ message: 'Result added' });
+  try {
+    // Check if a result already exists for this student/subject/term/session/class
+    const existing = await db.get(
+      'SELECT * FROM results WHERE student_id = ? AND subject = ? AND term = ? AND session = ? AND class = ?',
+      [student_id, subject, term, session, className]
+    );
+
+    if (existing) {
+      // Merge partial fields: if provided (not null) use new value, else keep existing
+      const newCa1 = ca1 !== null && ca1 !== '' ? Number(ca1) : existing.ca1;
+      const newCa2 = ca2 !== null && ca2 !== '' ? Number(ca2) : existing.ca2;
+      const newCa3 = ca3 !== null && ca3 !== '' ? Number(ca3) : existing.ca3;
+      const newScore = score !== null && score !== '' ? Number(score) : existing.score;
+      const newGrade = (grade !== null && grade !== '') ? grade : existing.grade;
+      const newRemark = remark || existing.remark || '';
+
+      await db.run(
+        `UPDATE results SET ca1 = ?, ca2 = ?, ca3 = ?, score = ?, grade = ?, remark = ?, approved = 0 WHERE id = ?`,
+        [newCa1, newCa2, newCa3, newScore, newGrade, newRemark, existing.id]
+      );
+
+      return res.json({ message: 'Result updated (unapproved) and sent for re-approval', id: existing.id });
+    }
+
+    // Insert new result; missing numeric fields default to NULL or 0 depending on DB schema
+    const insert = await db.run(
+      'INSERT INTO results (student_id, subject, ca1, ca2, ca3, score, grade, term, session, remark, approved, class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [student_id, subject, ca1 !== null && ca1 !== '' ? Number(ca1) : null,
+        ca2 !== null && ca2 !== '' ? Number(ca2) : null,
+        ca3 !== null && ca3 !== '' ? Number(ca3) : null,
+        score !== null && score !== '' ? Number(score) : null,
+        grade || null, term, session, remark || '', 0, className]
+    );
+
+    res.json({ message: 'Result added (pending approval)', id: insert.lastID });
+  } catch (err) {
+    console.error('Error in /manual', err);
+    res.status(500).json({ message: 'Error saving result' });
+  }
+});
+
+// Allow updating an existing result by id -- teachers can come back and complete fields.
+router.put('/manual/:id', async (req, res) => {
+  const id = req.params.id;
+  const { ca1 = null, ca2 = null, ca3 = null, score = null, grade = null, remark = null } = req.body;
+  const db = await openDb();
+  try {
+    const existing = await db.get('SELECT * FROM results WHERE id = ?', [id]);
+    if (!existing) return res.status(404).json({ message: 'Result not found' });
+
+    const newCa1 = ca1 !== null && ca1 !== '' ? Number(ca1) : existing.ca1;
+    const newCa2 = ca2 !== null && ca2 !== '' ? Number(ca2) : existing.ca2;
+    const newCa3 = ca3 !== null && ca3 !== '' ? Number(ca3) : existing.ca3;
+    const newScore = score !== null && score !== '' ? Number(score) : existing.score;
+    const newGrade = (grade !== null && grade !== '') ? grade : existing.grade;
+    const newRemark = remark !== null ? remark : existing.remark;
+
+    await db.run(
+      `UPDATE results SET ca1 = ?, ca2 = ?, ca3 = ?, score = ?, grade = ?, remark = ?, approved = 0 WHERE id = ?`,
+      [newCa1, newCa2, newCa3, newScore, newGrade, newRemark, id]
+    );
+
+    res.json({ message: 'Result updated (unapproved)' });
+  } catch (err) {
+    console.error('Error updating result', err);
+    res.status(500).json({ message: 'Error updating result' });
+  }
 });
 
 // Fetch results by class

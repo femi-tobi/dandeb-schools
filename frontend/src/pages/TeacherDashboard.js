@@ -24,6 +24,7 @@ export default function TeacherDashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStudent, setModalStudent] = useState(null);
   const [studentResults, setStudentResults] = useState([]);
+  const [studentEdits, setStudentEdits] = useState({}); // { resultId: { ca1, ca2, score, grade, remark } }
   const [modalSubject, setModalSubject] = useState('');
   const [modalCA, setModalCA] = useState('');
   const [modalExam, setModalExam] = useState('');
@@ -183,8 +184,10 @@ export default function TeacherDashboard() {
     const { score } = resultInputs[student_id] || {};
     // prefer computed grade from gradeScores, fallback to manual input
     const computedGrade = gradeScores[student_id] || (resultInputs[student_id] && resultInputs[student_id].grade) || '';
-    if (!score || !computedGrade) {
-      setResultMsg('Score and grade are required.');
+    // Allow partial submission: at least one of CA or exam or grade must be present
+    const ca = caScores[student_id] || '';
+    if ((ca === '' || ca === undefined) && (score === '' || score === undefined) && !computedGrade) {
+      setResultMsg('Enter at least one of CA or Exam or Grade to submit.');
       return;
     }
     try {
@@ -192,13 +195,14 @@ export default function TeacherDashboard() {
       await axios.post('http://localhost:5000/api/results/manual', {
         student_id,
         subject,
-        score,
-        grade: computedGrade,
+        ca1: ca !== '' ? ca : undefined,
+        score: (score !== '' && score !== undefined) ? score : undefined,
+        grade: computedGrade || undefined,
         term,
         session,
         class: selectedClass
       });
-      setResultMsg('Result saved!');
+      setResultMsg('Result submitted (pending admin approval). You can edit it later.');
     } catch (err) {
       setResultMsg('Error saving result.');
     }
@@ -230,6 +234,12 @@ export default function TeacherDashboard() {
     try {
       const res = await axios.get(`http://localhost:5000/api/results?student_id=${student.student_id}&class=${selectedClass}&term=${term}&session=${session}`);
       setStudentResults(res.data);
+      // prepare editable copy
+      const edits = {};
+      res.data.forEach(r => {
+        edits[r.id] = { ca1: r.ca1 ?? '', ca2: r.ca2 ?? '', score: r.score ?? '', grade: r.grade ?? '', remark: r.remark ?? '' };
+      });
+      setStudentEdits(edits);
     } catch {
       setStudentResults([]);
     }
@@ -276,18 +286,25 @@ export default function TeacherDashboard() {
       setModalMsg('One or more subjects already have results for this student in this session/term/class.');
       return;
     }
-    if (batchResults.some(r => !r.subject || !r.ca1 || !r.ca2 || !r.exam || !r.grade || !r.remark)) {
-      setModalMsg('All fields are required for each row.');
-      return;
+    // Allow partial batch rows: require subject at minimum and at least one of ca1/ca2/exam/grade
+    for (const r of batchResults) {
+      if (!r.subject) {
+        setModalMsg('Each row must have a subject.');
+        return;
+      }
+      if ((r.ca1 === '' || r.ca1 === undefined) && (r.ca2 === '' || r.ca2 === undefined) && (r.exam === '' || r.exam === undefined) && !(r.grade)) {
+        setModalMsg('Each row must have at least one score or a grade.');
+        return;
+      }
     }
     try {
       for (const row of batchResults) {
         // compute fallback grade in case it's missing
-        const ca1 = Number(row.ca1 || 0);
-        const ca2 = Number(row.ca2 || 0);
-        const exam = Number(row.exam || 0);
-        const total = (isNaN(ca1) ? 0 : ca1) + (isNaN(ca2) ? 0 : ca2) + (isNaN(exam) ? 0 : exam);
-        const gradeToSend = row.grade || getGrade(total);
+        const ca1 = (row.ca1 !== undefined && row.ca1 !== '') ? Number(row.ca1) : undefined;
+        const ca2 = (row.ca2 !== undefined && row.ca2 !== '') ? Number(row.ca2) : undefined;
+        const exam = (row.exam !== undefined && row.exam !== '') ? Number(row.exam) : undefined;
+        const total = (Number(ca1 || 0) + Number(ca2 || 0) + Number(exam || 0));
+        const gradeToSend = row.grade || (total ? getGrade(Math.round(total)) : undefined);
         console.debug('[handleSubmitBatchResults] posting row for', modalStudent.student_id, { subject: row.subject, ca1, ca2, exam, total, grade: gradeToSend, term, session, class: selectedClass });
         await axios.post('http://localhost:5000/api/results/manual', {
           student_id: modalStudent.student_id,
@@ -296,7 +313,7 @@ export default function TeacherDashboard() {
           ca2: ca2,
           score: exam,
           grade: gradeToSend,
-          remark: row.remark,
+          remark: row.remark || undefined,
           term,
           session,
           class: selectedClass
@@ -505,12 +522,40 @@ export default function TeacherDashboard() {
                         {studentResults.map(r => (
                           <tr key={r.id}>
                             <td className="py-2 px-2 md:px-4">{r.subject}</td>
-                            <td className="py-2 px-2 md:px-4">{r.ca1}</td>
-                            <td className="py-2 px-2 md:px-4">{r.ca2}</td>
-                            <td className="py-2 px-2 md:px-4">{r.score}</td>
-                            <td className="py-2 px-2 md:px-4">{(Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.ca3 || 0) + Number(r.score || 0))}</td>
-                            <td className="py-2 px-2 md:px-4">{r.grade}</td>
-                            <td className="py-2 px-2 md:px-4">{r.remark}</td>
+                            <td className="py-2 px-2 md:px-4">
+                              <input type="number" value={studentEdits[r.id]?.ca1 ?? ''} onChange={e => setStudentEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ca1: e.target.value } }))} className="border p-1 rounded w-full md:w-20" />
+                            </td>
+                            <td className="py-2 px-2 md:px-4">
+                              <input type="number" value={studentEdits[r.id]?.ca2 ?? ''} onChange={e => setStudentEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ca2: e.target.value } }))} className="border p-1 rounded w-full md:w-20" />
+                            </td>
+                            <td className="py-2 px-2 md:px-4">
+                              <input type="number" value={studentEdits[r.id]?.score ?? ''} onChange={e => setStudentEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], score: e.target.value } }))} className="border p-1 rounded w-full md:w-20" />
+                            </td>
+                            <td className="py-2 px-2 md:px-4">{(Number(studentEdits[r.id]?.ca1 || 0) + Number(studentEdits[r.id]?.ca2 || 0) + Number(r.ca3 || 0) + Number(studentEdits[r.id]?.score || 0))}</td>
+                            <td className="py-2 px-2 md:px-4">
+                              <input type="text" value={studentEdits[r.id]?.grade ?? ''} onChange={e => setStudentEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], grade: e.target.value } }))} className="border p-1 rounded w-full md:w-20" />
+                            </td>
+                            <td className="py-2 px-2 md:px-4">
+                              <input type="text" value={studentEdits[r.id]?.remark ?? ''} onChange={e => setStudentEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], remark: e.target.value } }))} className="border p-1 rounded w-full md:w-24" />
+                            </td>
+                            <td className="py-2 px-2 md:px-4">
+                              <button className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded mr-2" onClick={async () => {
+                                try {
+                                  const payload = { ca1: studentEdits[r.id]?.ca1, ca2: studentEdits[r.id]?.ca2, score: studentEdits[r.id]?.score, grade: studentEdits[r.id]?.grade, remark: studentEdits[r.id]?.remark };
+                                  await axios.put(`http://localhost:5000/api/results/manual/${r.id}`, payload);
+                                  // Refresh results
+                                  const res = await axios.get(`http://localhost:5000/api/results?student_id=${modalStudent.student_id}&class=${selectedClass}&term=${term}&session=${session}`);
+                                  setStudentResults(res.data);
+                                  const edits = {};
+                                  res.data.forEach(rr => { edits[rr.id] = { ca1: rr.ca1 ?? '', ca2: rr.ca2 ?? '', score: rr.score ?? '', grade: rr.grade ?? '', remark: rr.remark ?? '' }; });
+                                  setStudentEdits(edits);
+                                  setModalMsg('Result updated and pending approval.');
+                                } catch (err) {
+                                  setModalMsg('Error updating result.');
+                                }
+                              }}>Save</button>
+                              <span className="text-sm text-gray-600">{r.approved ? 'Approved' : 'Pending'}</span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
