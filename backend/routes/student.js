@@ -138,10 +138,26 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const infoTableY = y;
   const infoColWidths = [usableWidth / 3, usableWidth / 3, usableWidth / 3];
   const infoColX = [borderMargin, borderMargin + infoColWidths[0], borderMargin + infoColWidths[0] + infoColWidths[1], borderMargin + infoColWidths[0] + infoColWidths[1] + infoColWidths[2]];
-  // Horizontal lines
-  doc.moveTo(infoColX[0], infoTableY).lineTo(infoColX[3], infoTableY).stroke();
-  doc.moveTo(infoColX[0], infoTableY + 20).lineTo(infoColX[3], infoTableY + 20).stroke();
-  doc.moveTo(infoColX[0], infoTableY + 40).lineTo(infoColX[3], infoTableY + 40).stroke();
+  // Horizontal lines - leave a gap where the passport box appears on the right
+  const leftLineStart = infoColX[0];
+  const rightLineEnd = infoColX[3];
+  const gapStart = passportBoxX - 6; // small padding before passport box
+  const gapEnd = passportBoxX + passportBoxWidth + 6; // small padding after passport box
+
+  const drawHorizontalWithGap = (yPos) => {
+    // left segment
+    if (leftLineStart < gapStart) {
+      doc.moveTo(leftLineStart, yPos).lineTo(Math.min(gapStart, rightLineEnd), yPos).stroke();
+    }
+    // right segment
+    if (gapEnd < rightLineEnd) {
+      doc.moveTo(Math.max(gapEnd, leftLineStart), yPos).lineTo(rightLineEnd, yPos).stroke();
+    }
+  };
+
+  drawHorizontalWithGap(infoTableY);
+  drawHorizontalWithGap(infoTableY + 20);
+  drawHorizontalWithGap(infoTableY + 40);
   // Vertical lines
   for (let i = 0; i < infoColX.length; i++) {
     doc.moveTo(infoColX[i], infoTableY).lineTo(infoColX[i], infoTableY + 40).stroke();
@@ -250,6 +266,85 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   // Move doc.y to below info section
   doc.y = infoTableY + 60;
 
+  // === CHARACTER / PERSONALITY TABLES ===
+  // Draw two small side-by-side tables titled "Character" and "Character (cont'd)"
+  const tblGap = 12;
+  const tblWidth = (usableWidth - tblGap) / 2;
+  const leftX = borderMargin;
+  const rightX = borderMargin + tblWidth + tblGap;
+  const tblHeaderHeight = 18;
+  const tblRowHeight = 14;
+  // left table items
+  const leftItems = ['Attendance', 'Attentiveness', 'Punctuality'];
+  // right table items (continued)
+  const rightItems = ['Neatness', 'Politeness', 'Relationship with others'];
+
+  // drawCharacterTable now supports options: { nameColWidth, ratingColWidths }
+  const drawCharacterTable = (x, yStart, title, items, opts = {}) => {
+    // define columns: first column for trait, remaining rating columns
+    const ratingCols = opts.ratingColWidths ? opts.ratingColWidths.length : 5;
+    const nameColWidth = opts.nameColWidth ?? Math.max(70, Math.round(tblWidth * 0.35));
+    const ratingColWidths = opts.ratingColWidths ?? (() => {
+      const remaining = tblWidth - nameColWidth;
+      const w = Math.floor(remaining / ratingCols);
+      return new Array(ratingCols).fill(w);
+    })();
+
+    // header background
+    doc.save();
+    doc.roundedRect(x, yStart, tblWidth, tblHeaderHeight, 4).fillOpacity(1).fill('#F7CFE6');
+    doc.restore();
+    // Place title in the first (name) column, left-aligned
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000').text(title, x + 6, yStart + 4, { width: nameColWidth - 12, align: 'left' });
+
+    // draw header bottom line
+    doc.moveTo(x, yStart + tblHeaderHeight).lineTo(x + tblWidth, yStart + tblHeaderHeight).stroke();
+
+    // draw column separators for all columns
+    let segX = x + nameColWidth;
+    for (let c = 0; c < ratingColWidths.length; c++) {
+      // vertical separator for rating column
+      doc.moveTo(segX, yStart).lineTo(segX, yStart + tblHeaderHeight + items.length * tblRowHeight).stroke();
+      segX += ratingColWidths[c];
+    }
+
+    // rating labels (top of rating columns)
+    const ratings = opts.ratings || ['Excellent', 'Very good', 'Good', 'Fair', 'Poor'];
+    let rx = x + nameColWidth;
+    for (let i = 0; i < ratingColWidths.length; i++) {
+      const rWidth = ratingColWidths[i];
+      doc.fontSize(8).font('Helvetica').text(ratings[i] || '', rx + 2, yStart + 2, { width: rWidth - 4, align: 'center' });
+      rx += rWidth;
+    }
+
+    // draw rows
+    for (let r = 0; r < items.length; r++) {
+      const rowY = yStart + tblHeaderHeight + r * tblRowHeight;
+      // name cell
+      doc.rect(x, rowY, nameColWidth, tblRowHeight).stroke();
+      // left-align trait name at top of cell
+      doc.fontSize(9).font('Helvetica').fillColor('#000000').text(items[r], x + 4, rowY + 2, { width: nameColWidth - 8, align: 'left' });
+      // rating cells
+      let cellX = x + nameColWidth;
+      for (let c = 0; c < ratingColWidths.length; c++) {
+        const w = ratingColWidths[c];
+        doc.rect(cellX, rowY, w, tblRowHeight).stroke();
+        cellX += w;
+      }
+    }
+
+    return yStart + tblHeaderHeight + items.length * tblRowHeight;
+  };
+
+  const charYStart = doc.y + 8;
+  // Example: pass custom widths if you want to control column sizes.
+  // nameColWidth is width of the first (trait) column in points.
+  // ratingColWidths is an array of widths for each rating column.
+  const leftEndY = drawCharacterTable(leftX, charYStart, 'Character', leftItems, { nameColWidth: 110, ratingColWidths: [39,26,26,36,36] });
+  const rightEndY = drawCharacterTable(rightX, charYStart, "Character (cont)'d", rightItems, { nameColWidth: 120, ratingColWidths: [38,26,26,26,36] });
+  // advance doc.y to below the tables
+  doc.y = Math.max(leftEndY, rightEndY) + 12;
+
   // Insert additional section image (Regularity, Conduct, Physical Development)
   const extraSectionPath = path.join(__dirname, 'report_extra_section.jpg');
   try {
@@ -261,11 +356,11 @@ router.get('/:student_id/result/pdf', async (req, res) => {
 const margin = borderMargin;
 const colWidths = [
   90, // SUBJECTS
-  20, // CA1
-  20, // CA2
+  22, // CA1
+  22, // CA2
   23, // CA Total
   25, // Exam
-  13, // Total
+  23, // Total
   25, // Grade
   35, // Remark
   60, // Prev Term 1
