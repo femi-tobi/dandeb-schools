@@ -354,31 +354,36 @@ router.get('/:student_id/result/pdf', async (req, res) => {
 
 // === MAIN RESULT TABLE ===
 const margin = borderMargin;
-const colWidths = [
-  90, // SUBJECTS
-  22, // CA1
-  22, // CA2
-  23, // CA Total
-  25, // Exam
-  23, // Total
-  25, // Grade
-  35, // Remark
-  60, // Prev Term 1
-  50, // Prev Term 2
-  60, // Cumulative
-  40, // Highest
-  40, // Lowest
-  40  // Average
-];
-const colX = [margin];
-for (let i = 0; i < colWidths.length; i++) {
-  colX.push(colX[i] + colWidths[i]);
+// Determine if any exam scores exist for this student's results
+const hasExam = results.some(r => r.score !== null && r.score !== undefined && String(r.score).trim() !== '');
+
+// Build columns dynamically depending on whether exam-related columns are needed
+const cols = [];
+cols.push({ key: 'subject', width: 90 });
+cols.push({ key: 'ca1', width: 22 });
+cols.push({ key: 'ca2', width: 22 });
+cols.push({ key: 'caTotal', width: 23 });
+if (hasExam) {
+  cols.push({ key: 'exam', width: 25 });
+  cols.push({ key: 'total', width: 23 });
+  cols.push({ key: 'grade', width: 25 });
 }
-const rowHeight = 20; // Normal row height for data rows
-const headerRowHeight = 44; // Taller header row
+cols.push({ key: 'remark', width: 35 });
+cols.push({ key: 'prev1', width: 60 });
+cols.push({ key: 'prev2', width: 50 });
+cols.push({ key: 'cumulative', width: 60 });
+cols.push({ key: 'highest', width: 40 });
+cols.push({ key: 'lowest', width: 40 });
+cols.push({ key: 'average', width: 40 });
+
+const colWidths = cols.map(c => c.width);
+const colX = [margin];
+for (let i = 0; i < colWidths.length; i++) colX.push(colX[i] + colWidths[i]);
+const rowHeight = 20;
+const headerRowHeight = 44;
 const tableStartY = doc.y + 10;
 
-// Calculate total number of rows: student results only
+// Compute subject totals for class stats (grouped by subject)
 const classSubjectRows = await db.all(
   'SELECT subject, ca1, ca2, score FROM results WHERE class = ? AND term = ? AND session = ?',
   [student.class, term, session]
@@ -392,128 +397,138 @@ classSubjectRows.forEach(r => {
 const numRows = results.length;
 const dataStartY = tableStartY + headerRowHeight * 2;
 
-// Draw only the outer border for the first header row
+// Outer border for header area
 doc.moveTo(colX[0], tableStartY).lineTo(colX[colX.length - 1], tableStartY).stroke();
 const firstHeaderBottomY = tableStartY + headerRowHeight;
 doc.moveTo(colX[0], firstHeaderBottomY).lineTo(colX[colX.length - 1], firstHeaderBottomY).stroke();
 doc.moveTo(colX[0], tableStartY).lineTo(colX[0], firstHeaderBottomY).stroke();
 doc.moveTo(colX[colX.length - 1], tableStartY).lineTo(colX[colX.length - 1], firstHeaderBottomY).stroke();
 
-// Draw vertical column lines from the second header row downward
+// Vertical column lines from second header row downward
 for (let i = 0; i < colX.length; i++) {
   doc.moveTo(colX[i], firstHeaderBottomY).lineTo(colX[i], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
 }
-// Draw horizontal lines for the second header row and data rows
+
+// Horizontal lines for second header row and data rows
 for (let r = 1; r <= 2; r++) {
   doc.moveTo(colX[0], tableStartY + r * headerRowHeight).lineTo(colX[colX.length - 1], tableStartY + r * headerRowHeight).stroke();
 }
-// Draw the first data row horizontal line only from colX[1] to the end
+// First data row horizontal from second column to end
 doc.moveTo(colX[1], dataStartY).lineTo(colX[colX.length - 1], dataStartY).stroke();
-// Draw the rest of the data row horizontal lines
 for (let r = 1; r <= numRows; r++) {
   doc.moveTo(colX[0], dataStartY + r * rowHeight).lineTo(colX[colX.length - 1], dataStartY + r * rowHeight).stroke();
 }
-// Draw a less bold vertical line before the previous terms summaries (at colX[8])
-doc.save();
-doc.lineWidth(1.2);
-doc.moveTo(colX[8], tableStartY).lineTo(colX[8], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
-doc.restore();
-// Draw a less bold vertical line before the TOTAL MARK OBTAINED (Exams & CA) OVER 100% column (at colX[5])
-doc.save();
-doc.lineWidth(1.2);
-doc.moveTo(colX[5], tableStartY).lineTo(colX[5], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
-doc.restore();
-// Draw a less bold vertical line at the start of the CA columns (at colX[1])
-doc.save();
-doc.lineWidth(1.2);
-doc.moveTo(colX[1], tableStartY).lineTo(colX[1], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
-doc.restore();
-// Draw a less bold vertical line at the end of the CA columns (at colX[4])
-doc.save();
-doc.lineWidth(1.2);
-doc.moveTo(colX[4], tableStartY).lineTo(colX[4], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
-doc.restore();
-// Draw a less bold vertical line before the class stats (at colX[11])
-doc.save();
-doc.lineWidth(1.2);
-doc.moveTo(colX[11], tableStartY).lineTo(colX[11], tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke();
+
+// Draw slightly bolder separators for groups: CA start and end, totals, prev summaries, class stats
+const idx = (key) => cols.findIndex(c => c.key === key);
+const safeMoveTo = (x) => { try { doc.moveTo(x, tableStartY).lineTo(x, tableStartY + headerRowHeight * 2 + rowHeight * numRows).stroke(); } catch (e) {} };
+
+doc.save(); doc.lineWidth(1.2); if (idx('prev1') >= 0) safeMoveTo(colX[idx('prev1')]); doc.restore();
+doc.save(); doc.lineWidth(1.2); if (idx('total') >= 0) safeMoveTo(colX[idx('total')]); doc.restore();
+doc.save(); doc.lineWidth(1.2); if (idx('ca1') >= 0) safeMoveTo(colX[idx('ca1')]); doc.restore();
+doc.save(); doc.lineWidth(1.2); if (idx('exam') >= 0) safeMoveTo(colX[idx('exam')]); doc.restore();
+doc.save(); doc.lineWidth(1.2); if (idx('highest') >= 0) safeMoveTo(colX[idx('highest')]); doc.restore();
+
+// Vertical 'SUBJECTS' header (rotated)
+doc.save(); doc.font('Helvetica-Bold').fontSize(11);
+doc.rotate(-90, { origin: [colX[0] + cols[0].width / 2, tableStartY + headerRowHeight + 10] });
+doc.text('SUBJECTS', colX[0] + cols[0].width / 4, tableStartY + headerRowHeight + 10, { align: 'center', width: cols[0].width });
 doc.restore();
 
-// Vertical 'SUBJECTS' header (centered in header area)
-doc.save();
-doc.font('Helvetica-Bold').fontSize(11);
-doc.rotate(-90, { origin: [colX[0] + colWidths[0] / 2, tableStartY + headerRowHeight + 10] });
-doc.text('SUBJECTS', colX[0] + colWidths[0] / 4, tableStartY + headerRowHeight + 10, { align: 'center', width: colWidths[0] });
-doc.restore();
-
-// Grouped headers (centered in header area)
+// Grouped headers
 const groupHeaderY = tableStartY + headerRowHeight / 4;
 doc.font('Helvetica-Bold').fontSize(8);
-doc.text('SUMMARY OF CONTINUOUS ASSESSMENT TEST', colX[1], groupHeaderY, { width: colX[4] - colX[1], align: 'center' });
-doc.text('SUMMARY OF TERMS WORK', colX[5], groupHeaderY, { width: colX[8] - colX[5], align: 'center' });
-doc.text('PREVIOUS TERMS SUMMARIES', colX[8], groupHeaderY, { width: colX[11] - colX[8], align: 'center' });
-doc.text('CLASS STATS THIS TERM', colX[11], groupHeaderY, { width: colX[14] - colX[11], align: 'center' });
+// CA group spans ca1..caTotal
+if (idx('ca1') >= 0 && idx('caTotal') >= 0) {
+  const s = colX[idx('ca1')];
+  const e = colX[idx('caTotal') + 1];
+  doc.text('SUMMARY OF CONTINUOUS ASSESSMENT TEST', s, groupHeaderY, { width: e - s, align: 'center' });
+}
+// Terms work group spans from total/exam section start to prev1 start
+if (idx('exam') >= 0) {
+  const s = colX[idx('exam')];
+  const e = colX[idx('prev1') >= 0 ? idx('prev1') : colX.length - 1];
+  doc.text('SUMMARY OF TERMS WORK', s, groupHeaderY, { width: (idx('prev1') >= 0 ? colX[idx('prev1')] - s : colX[colX.length - 1] - s), align: 'center' });
+} else {
+  // If no exam, the terms work group starts at caTotal
+  if (idx('caTotal') >= 0) {
+    const s = colX[idx('caTotal') + 1] || colX[idx('caTotal')];
+    const e = colX[idx('prev1')] || colX[colX.length - 1];
+    doc.text('SUMMARY OF TERMS WORK', s, groupHeaderY, { width: e - s, align: 'center' });
+  }
+}
+if (idx('prev1') >= 0) {
+  const s = colX[idx('prev1')];
+  const e = colX[idx('highest')];
+  doc.text('PREVIOUS TERMS SUMMARIES', s, groupHeaderY, { width: e - s, align: 'center' });
+}
+if (idx('highest') >= 0) {
+  const s = colX[idx('highest')];
+  const e = colX[colX.length - 1];
+  doc.text('CLASS STATS THIS TERM', s, groupHeaderY, { width: e - s, align: 'center' });
+}
 
-// Second header row for CA columns and PREVIOUS TERMS SUMMARIES
+// Second header row labels
 const caHeaderY = tableStartY + headerRowHeight + headerRowHeight / 4;
 doc.font('Helvetica-Bold').fontSize(8);
-doc.text('1ST C.A.', colX[1], caHeaderY, { width: colX[2] - colX[1], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(7);
-doc.text('2ND C.A.', colX[2], caHeaderY, { width: colX[3] - colX[2], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(7);
-doc.text('TOTAL', colX[3], caHeaderY, { width: colX[4] - colX[3], align: 'center' });
-doc.font('Helvetica-Bold').fontSize(7);
-doc.text('Exams', colX[4], caHeaderY, { width: colX[5] - colX[4], align: 'center' });
-doc.font('Helvetica').fontSize(7);
-doc.text('100%', colX[5], caHeaderY, { width: colX[6] - colX[5], align: 'center' });
-doc.text('GRADE SCORE', colX[6], caHeaderY, { width: colX[7] - colX[6], align: 'center' });
-doc.text('GRADE REMARKS', colX[7], caHeaderY, { width: colX[8] - colX[7], align: 'center' });
-doc.text('FIRST TERM SUMMARY', colX[8], caHeaderY, { width: colX[9] - colX[8], align: 'center' });
-doc.text('SECOND TERM SUMMARY', colX[9], caHeaderY, { width: colX[10] - colX[9], align: 'center' });
-doc.text('CUMULATIVE AVERAGE', colX[10], caHeaderY, { width: colX[11] - colX[10], align: 'center' });
-doc.text('HIGHEST', colX[11], caHeaderY, { width: colX[12] - colX[11], align: 'center' });
-doc.text('LOWEST', colX[12], caHeaderY, { width: colX[13] - colX[12], align: 'center' });
-doc.text('AVERAGE', colX[13], caHeaderY, { width: colX[14] - colX[13], align: 'center' });
+if (idx('ca1') >= 0) doc.text('1ST C.A.', colX[idx('ca1')], caHeaderY, { width: colX[idx('ca1') + 1] - colX[idx('ca1')], align: 'center' });
+if (idx('ca2') >= 0) doc.font('Helvetica-Bold').fontSize(7).text('2ND C.A.', colX[idx('ca2')], caHeaderY, { width: colX[idx('ca2') + 1] - colX[idx('ca2')], align: 'center' });
+if (idx('caTotal') >= 0) doc.font('Helvetica-Bold').fontSize(7).text('TOTAL', colX[idx('caTotal')], caHeaderY, { width: colX[idx('caTotal') + 1] - colX[idx('caTotal')], align: 'center' });
+if (hasExam) {
+  doc.font('Helvetica-Bold').fontSize(7).text('Exams', colX[idx('exam')], caHeaderY, { width: colX[idx('exam') + 1] - colX[idx('exam')], align: 'center' });
+  doc.font('Helvetica').fontSize(7).text('100%', colX[idx('total')], caHeaderY, { width: colX[idx('total') + 1] - colX[idx('total')], align: 'center' });
+  doc.text('GRADE SCORE', colX[idx('grade')], caHeaderY, { width: colX[idx('grade') + 1] - colX[idx('grade')], align: 'center' });
+  doc.text('GRADE REMARKS', colX[idx('remark')], caHeaderY, { width: colX[idx('remark') + 1] - colX[idx('remark')], align: 'center' });
+} else {
+  // If no exam column, shift labels: remark will be at idx('remark')
+  doc.font('Helvetica').fontSize(7).text('GRADE REMARKS', colX[idx('remark')], caHeaderY, { width: colX[idx('prev1')] - colX[idx('remark')], align: 'center' });
+}
+if (idx('prev1') >= 0) doc.text('FIRST TERM SUMMARY', colX[idx('prev1')], caHeaderY, { width: colX[idx('prev1') + 1] - colX[idx('prev1')], align: 'center' });
+if (idx('prev2') >= 0) doc.text('SECOND TERM SUMMARY', colX[idx('prev2')], caHeaderY, { width: colX[idx('prev2') + 1] - colX[idx('prev2')], align: 'center' });
+if (idx('cumulative') >= 0) doc.text('CUMULATIVE AVERAGE', colX[idx('cumulative')], caHeaderY, { width: colX[idx('cumulative') + 1] - colX[idx('cumulative')], align: 'center' });
+if (idx('highest') >= 0) doc.text('HIGHEST', colX[idx('highest')], caHeaderY, { width: colX[idx('highest') + 1] - colX[idx('highest')], align: 'center' });
+if (idx('lowest') >= 0) doc.text('LOWEST', colX[idx('lowest')], caHeaderY, { width: colX[idx('lowest') + 1] - colX[idx('lowest')], align: 'center' });
+if (idx('average') >= 0) doc.text('AVERAGE', colX[idx('average')], caHeaderY, { width: colX[idx('average') + 1] - colX[idx('average')], align: 'center' });
 
 // Fill in subject rows with class stats
 let rowY = dataStartY;
 doc.font('Helvetica').fontSize(9);
-results.forEach((r, idx) => {
-  // Student result row
-  doc.text(r.subject, colX[0], rowY + 5, { width: colX[1] - colX[0], align: 'center' });
-  doc.text(r.ca1 ?? '', colX[1], rowY + 5, { width: colX[2] - colX[1], align: 'center' });
-  doc.text(r.ca2 ?? '', colX[2], rowY + 5, { width: colX[3] - colX[2], align: 'center' });
+results.forEach((r) => {
+  doc.text(r.subject, colX[idx('subject')], rowY + 5, { width: colX[idx('subject') + 1] - colX[idx('subject')], align: 'center' });
+  doc.text(r.ca1 ?? '', colX[idx('ca1')], rowY + 5, { width: colX[idx('ca1') + 1] - colX[idx('ca1')], align: 'center' });
+  doc.text(r.ca2 ?? '', colX[idx('ca2')], rowY + 5, { width: colX[idx('ca2') + 1] - colX[idx('ca2')], align: 'center' });
   const caTotal = (Number(r.ca1) || 0) + (Number(r.ca2) || 0);
-  doc.text(caTotal, colX[3], rowY + 5, { width: colX[4] - colX[3], align: 'center' });
-  doc.text(r.score ?? '', colX[4], rowY + 5, { width: colX[5] - colX[4], align: 'center' });
-  const total = caTotal + (Number(r.score) || 0);
-  doc.text(total, colX[5], rowY + 5, { width: colX[6] - colX[5], align: 'center' });
-  doc.text(r.grade ?? '', colX[6], rowY + 5, { width: colX[7] - colX[6], align: 'center' });
-  doc.text(r.remark ?? '', colX[7], rowY + 5, { width: colX[8] - colX[7], align: 'center' });
+  doc.text(caTotal, colX[idx('caTotal')], rowY + 5, { width: colX[idx('caTotal') + 1] - colX[idx('caTotal')], align: 'center' });
+  if (hasExam) {
+    doc.text(r.score ?? '', colX[idx('exam')], rowY + 5, { width: colX[idx('exam') + 1] - colX[idx('exam')], align: 'center' });
+    const total = caTotal + (Number(r.score) || 0);
+    doc.text(total, colX[idx('total')], rowY + 5, { width: colX[idx('total') + 1] - colX[idx('total')], align: 'center' });
+    doc.text(r.grade ?? '', colX[idx('grade')], rowY + 5, { width: colX[idx('grade') + 1] - colX[idx('grade')], align: 'center' });
+  }
+  doc.text(r.remark ?? '', colX[idx('remark')], rowY + 5, { width: colX[idx('remark') + 1] - colX[idx('remark')], align: 'center' });
 
   // Previous term summaries per subject
   const firstTermTotal = prev1Map[r.subject];
   const secondTermTotal = prev2Map[r.subject];
-  if (currentTermIndex >= 1 && firstTermTotal !== undefined) {
-    doc.text(String(firstTermTotal), colX[8], rowY + 5, { width: colX[9] - colX[8], align: 'center' });
+  if (idx('prev1') >= 0 && currentTermIndex >= 1 && firstTermTotal !== undefined) {
+    doc.text(String(firstTermTotal), colX[idx('prev1')], rowY + 5, { width: colX[idx('prev1') + 1] - colX[idx('prev1')], align: 'center' });
   }
-  if (currentTermIndex >= 2 && secondTermTotal !== undefined) {
-    doc.text(String(secondTermTotal), colX[9], rowY + 5, { width: colX[10] - colX[9], align: 'center' });
+  if (idx('prev2') >= 0 && currentTermIndex >= 2 && secondTermTotal !== undefined) {
+    doc.text(String(secondTermTotal), colX[idx('prev2')], rowY + 5, { width: colX[idx('prev2') + 1] - colX[idx('prev2')], align: 'center' });
   }
   let cumulativeTerms = [];
-  if (currentTermIndex === 0) {
-    cumulativeTerms = [];
-  } else if (currentTermIndex === 1) {
+  if (currentTermIndex === 0) cumulativeTerms = [];
+  else if (currentTermIndex === 1) {
     if (firstTermTotal !== undefined) cumulativeTerms.push(firstTermTotal);
-    cumulativeTerms.push(total);
+    cumulativeTerms.push(hasExam ? (caTotal + (Number(r.score) || 0)) : caTotal);
   } else if (currentTermIndex === 2) {
     if (firstTermTotal !== undefined) cumulativeTerms.push(firstTermTotal);
     if (secondTermTotal !== undefined) cumulativeTerms.push(secondTermTotal);
-    cumulativeTerms.push(total);
+    cumulativeTerms.push(hasExam ? (caTotal + (Number(r.score) || 0)) : caTotal);
   }
-  if (cumulativeTerms.length > 0) {
+  if (cumulativeTerms.length > 0 && idx('cumulative') >= 0) {
     const cumAvg = Math.round((cumulativeTerms.reduce((a, b) => a + b, 0) / cumulativeTerms.length));
-    doc.text(String(cumAvg), colX[10], rowY + 5, { width: colX[11] - colX[10], align: 'center' });
+    doc.text(String(cumAvg), colX[idx('cumulative')], rowY + 5, { width: colX[idx('cumulative') + 1] - colX[idx('cumulative')], align: 'center' });
   }
 
   // Add class stats in new columns for this subject
@@ -522,9 +537,9 @@ results.forEach((r, idx) => {
     const highest = Math.max(...arr);
     const lowest = Math.min(...arr);
     const avg = (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2);
-    doc.text(String(highest), colX[11], rowY + 5, { width: colX[12] - colX[11], align: 'center' });
-    doc.text(String(lowest), colX[12], rowY + 5, { width: colX[13] - colX[12], align: 'center' });
-    doc.text(String(avg), colX[13], rowY + 5, { width: colX[14] - colX[13], align: 'center' });
+    if (idx('highest') >= 0) doc.text(String(highest), colX[idx('highest')], rowY + 5, { width: colX[idx('highest') + 1] - colX[idx('highest')], align: 'center' });
+    if (idx('lowest') >= 0) doc.text(String(lowest), colX[idx('lowest')], rowY + 5, { width: colX[idx('lowest') + 1] - colX[idx('lowest')], align: 'center' });
+    if (idx('average') >= 0) doc.text(String(avg), colX[idx('average')], rowY + 5, { width: colX[idx('average') + 1] - colX[idx('average')], align: 'center' });
   }
   rowY += rowHeight;
 });
