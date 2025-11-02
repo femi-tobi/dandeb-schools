@@ -501,7 +501,7 @@ export default function TeacherDashboard() {
                   onRequestClose={closeStudentModal}
                   contentLabel="Student Results Modal"
                   ariaHideApp={false}
-                  className="bg-white rounded shadow p-2 md:p-6 max-w-3xl w-full mx-auto mt-10 md:mt-20 outline-none overflow-x-auto"
+                  className="bg-white rounded shadow p-2 md:p-6 max-w-3xl w-full mx-auto mt-10 md:mt-20 outline-none overflow-auto max-h-[80vh]"
                   overlayClassName="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center"
                 >
                   <h3 className="font-bold mb-2 text-green-700 text-base md:text-lg">Results for {modalStudent?.fullname}</h3>

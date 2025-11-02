@@ -69,6 +69,7 @@ export default function AdminDashboard() {
   const [pendingModalResults, setPendingModalResults] = useState([]);
   const [pendingModalStudent, setPendingModalStudent] = useState(null);
   const [promotionMsg, setPromotionMsg] = useState('');
+  const [selectedPending, setSelectedPending] = useState([]);
 
   // Add state for modal
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -447,6 +448,37 @@ export default function AdminDashboard() {
         alert('Results approved!');
       })
       .catch(() => alert('Failed to approve results.'));
+  };
+
+  const toggleSelectPending = (key) => {
+    setSelectedPending(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+
+  const toggleSelectAllPending = () => {
+    if (selectedPending.length === pendingStudents.length) {
+      setSelectedPending([]);
+    } else {
+      setSelectedPending(pendingStudents.map(s => `${s.student_id}||${s.term}||${s.session}`));
+    }
+  };
+
+  const handleApproveSelected = async () => {
+    if (selectedPending.length === 0) return alert('No pending items selected');
+    const items = selectedPending.map(key => {
+      const [student_id, term, session] = key.split('||');
+      return { student_id, term, session };
+    });
+    try {
+      await axios.post('http://localhost:5000/api/admin/approve-results-bulk', { items });
+      // Filter out approved from pendingStudents
+      const remaining = pendingStudents.filter(s => !selectedPending.includes(`${s.student_id}||${s.term}||${s.session}`));
+      setPendingStudents(remaining);
+      setSelectedPending([]);
+      alert('Selected results approved');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to approve selected results');
+    }
   };
 
   const viewPendingResults = (student_id, term, session, student) => {
@@ -868,9 +900,11 @@ export default function AdminDashboard() {
             {pendingStudents.length === 0 ? (
               <div className="text-green-700">No pending results to approve.</div>
             ) : (
+              <>
               <table className="min-w-full">
                 <thead>
                   <tr>
+                    <th className="py-2 px-4 text-left"><input type="checkbox" checked={selectedPending.length === pendingStudents.length && pendingStudents.length > 0} onChange={toggleSelectAllPending} /></th>
                     <th className="py-2 px-4 text-left">Student</th>
                     <th className="py-2 px-4 text-left">Class</th>
                     <th className="py-2 px-4 text-left">Term</th>
@@ -881,6 +915,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {pendingStudents.map(s => (
                     <tr key={s.student_id + s.term + s.session}>
+                      <td className="py-2 px-4"><input type="checkbox" checked={selectedPending.includes(`${s.student_id}||${s.term}||${s.session}`)} onChange={() => toggleSelectPending(`${s.student_id}||${s.term}||${s.session}`)} /></td>
                       <td className="py-2 px-4">{s.fullname}</td>
                       <td className="py-2 px-4">{s.class}</td>
                       <td className="py-2 px-4">{s.term}</td>
@@ -903,6 +938,11 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              <div className="mt-3">
+                <button className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded mr-2" onClick={handleApproveSelected} disabled={selectedPending.length === 0}>Approve Selected</button>
+                <span className="text-sm text-gray-600">{selectedPending.length} selected</span>
+              </div>
+              </>
             )}
           </div>
         </div>

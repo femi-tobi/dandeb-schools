@@ -107,6 +107,7 @@ export default function StudentDashboard() {
 
   // Debug log for results
   console.log('Student results:', results);
+  const hasExam = results.some(r => r.score !== null && r.score !== undefined && String(r.score).trim() !== '');
 
   return (
     <div className="min-h-screen bg-green-50">
@@ -191,7 +192,7 @@ export default function StudentDashboard() {
                   <th className="py-2 px-4 text-left text-green-900">CA2</th>
                   <th className="py-2 px-4 text-left text-green-900">Exam</th>
                   <th className="py-2 px-4 text-left text-green-900">Total</th>
-                  <th className="py-2 px-4 text-left text-green-900">Grade</th>
+                  {hasExam && <th className="py-2 px-4 text-left text-green-900">Grade</th>}
                   <th className="py-2 px-4 text-left text-green-900">Remark</th>
                 </tr>
               </thead>
@@ -208,7 +209,7 @@ export default function StudentDashboard() {
                       <td className="py-2 px-4">{r.ca2}</td>
                       <td className="py-2 px-4">{r.score}</td>
                       <td className="py-2 px-4">{total}</td>
-                      <td className={`py-2 px-4 ${gradeColor(r.grade)}`}>{r.grade}</td>
+                      {hasExam && <td className={`py-2 px-4 ${gradeColor(r.grade)}`}>{r.grade}</td>}
                       <td className="py-2 px-4">{r.remark}</td>
                     </tr>
                   );
