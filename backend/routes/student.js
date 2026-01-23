@@ -75,7 +75,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const usableWidth = pageWidth - 2 * borderMargin;
 
   // HEADER SECTION
-  const logoWidth = 40;
+  const logoWidth = 60;
   const logoHeight = 40;
   const logoY = borderMargin + 5;
   try { if (logoPath) doc.image(logoPath, borderMargin, logoY, { width: logoWidth }); } catch (e) { console.error('Failed to draw header logo:', e && e.message); }
@@ -579,7 +579,7 @@ doc.text(classRemark, remarkX, remarkY, { width: remarkWidth, align: 'left' });
 // Head Teacher's Remark
 remarksY += boxHeight;
 const headRemark = "Commendable result indeed, you have very large room to perform better. OLUMATOVIN MORE! MORE!";
-doc.font('Helvetica-Bold').fontSize(9).text("Head Teacher's Remark:", colX[0] + 5, remarksY + 7);
+doc.font('Helvetica-Bold').fontSize(9).text("Principal's Remark:", colX[0] + 5, remarksY + 7);
 const headRemarkHeight = doc.heightOfString(headRemark, { width: remarkWidth, align: 'left' });
 const headBoxHeight = Math.max(30, headRemarkHeight + 14);
 doc.rect(colX[0], remarksY, remarksWidth, headBoxHeight).stroke();
@@ -587,13 +587,13 @@ doc.font('Helvetica').fontSize(9).text(headRemark, remarkX, remarksY + 7, { widt
 
 // === KEY TO GRADING TABLE (bottom right) ===
 const gradingKey = [
-  ['A1', '75%-100%'],
-  ['B2', '70%-74.9%'],
-  ['B3', '65%-69.9%'],
-  ['C6', '60%-64.9%'],
-  ['D7', '55%-59.9%'],
-  ['E8', '50%-54.9%'],
-  ['F9', '0%-49.9%']
+  ['A', '75%-100%'],
+  ['B', '70%-74.9%'],
+  ['C', '65%-69.9%'],
+  ['D', '60%-64.9%'],
+  ['E', '55%-59.9%'],
+  ['F', '50%-54.9%'],
+  ['G', '0%-49.9%']
 ];
 
 const keyTableX = colX[0] + remarksWidth + 24;
