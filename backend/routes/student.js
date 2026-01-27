@@ -163,7 +163,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     doc.moveTo(infoColX[i], infoTableY).lineTo(infoColX[i], infoTableY + 40).stroke();
   }
   // Fill first row: Gender, Date of Birth, (empty)
-  doc.font('Helvetica-Bold').text('Gender:', infoColX[0] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.gender || 'Female');
+  doc.font('Helvetica-Bold').text('Gender:', infoColX[0] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.gender || '');
   doc.font('Helvetica-Bold').text('Date of Birth:', infoColX[1] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.dob || '');
   // Second row: Class, Students in Class, (empty)
   doc.font('Helvetica-Bold').text('Class:', infoColX[0] + 5, infoTableY + 25, { continued: true }).font('Helvetica').text(student.class || '');

@@ -34,8 +34,8 @@ router.get('/students', async (req, res) => {
 
 // Update POST /students to accept photo upload
 router.post('/students', upload.single('photo'), async (req, res) => {
-  const { fullname, student_id, class: className, password, session } = req.body;
-  console.log('Received student POST:', { fullname, student_id, className, password });
+  const { fullname, student_id, class: className, password, session, gender, dob } = req.body;
+  console.log('Received student POST:', { fullname, student_id, className, password, gender, dob });
   const db = await openDb();
   const hashed = await bcrypt.hash(password, 10);
   let photoPath = null;
@@ -44,8 +44,8 @@ router.post('/students', upload.single('photo'), async (req, res) => {
   }
   try {
     await db.run(
-      'INSERT INTO students (fullname, student_id, class, password, photo, session) VALUES (?, ?, ?, ?, ?, ?)',
-      [fullname, student_id, className, hashed, photoPath, session]
+      'INSERT INTO students (fullname, student_id, class, password, photo, session, gender, dob) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [fullname, student_id, className, hashed, photoPath, session, gender, dob]
     );
     res.json({ message: 'Student added' });
   } catch (e) {
@@ -56,7 +56,7 @@ router.post('/students', upload.single('photo'), async (req, res) => {
 
 // Update PUT /students/:id to accept photo upload
 router.put('/students/:id', upload.single('photo'), async (req, res) => {
-  const { fullname, class: className, password, session } = req.body;
+  const { fullname, class: className, password, session, gender, dob } = req.body;
   const { id } = req.params;
   const db = await openDb();
   let photoPath = null;
@@ -66,15 +66,15 @@ router.put('/students/:id', upload.single('photo'), async (req, res) => {
   if (password) {
     const hashed = await bcrypt.hash(password, 10);
     if (photoPath) {
-      await db.run('UPDATE students SET fullname = ?, class = ?, password = ?, photo = ?, session = ? WHERE id = ?', [fullname, className, hashed, photoPath, session, id]);
+      await db.run('UPDATE students SET fullname = ?, class = ?, password = ?, photo = ?, session = ?, gender = ?, dob = ? WHERE id = ?', [fullname, className, hashed, photoPath, session, gender, dob, id]);
     } else {
-      await db.run('UPDATE students SET fullname = ?, class = ?, password = ?, session = ? WHERE id = ?', [fullname, className, hashed, session, id]);
+      await db.run('UPDATE students SET fullname = ?, class = ?, password = ?, session = ?, gender = ?, dob = ? WHERE id = ?', [fullname, className, hashed, session, gender, dob, id]);
     }
   } else {
     if (photoPath) {
-      await db.run('UPDATE students SET fullname = ?, class = ?, photo = ?, session = ? WHERE id = ?', [fullname, className, photoPath, session, id]);
+      await db.run('UPDATE students SET fullname = ?, class = ?, photo = ?, session = ?, gender = ?, dob = ? WHERE id = ?', [fullname, className, photoPath, session, gender, dob, id]);
     } else {
-      await db.run('UPDATE students SET fullname = ?, class = ?, session = ? WHERE id = ?', [fullname, className, session, id]);
+      await db.run('UPDATE students SET fullname = ?, class = ?, session = ?, gender = ?, dob = ? WHERE id = ?', [fullname, className, session, gender, dob, id]);
     }
   }
   res.json({ message: 'Student updated' });

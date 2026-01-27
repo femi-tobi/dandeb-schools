@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   // Add/Edit Students state
   const [selectedClass, setSelectedClass] = useState('');
   const [studentsList, setStudentsList] = useState([]);
-  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
   const [studentMsg, setStudentMsg] = useState('');
 
   // Manage Teachers state
@@ -274,10 +274,12 @@ export default function AdminDashboard() {
       formData.append('class', selectedClass);
       formData.append('password', studentForm.password);
       formData.append('session', studentForm.session);
+      formData.append('gender', studentForm.gender);
+      formData.append('dob', studentForm.dob);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
       await axios.post('http://localhost:5000/api/admin/students', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student added!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -287,7 +289,7 @@ export default function AdminDashboard() {
   };
 
   const handleEditStudent = (student) => {
-    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null, session: '' });
+    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null, session: '', gender: student.gender || '', dob: student.dob || '' });
   };
 
   const handleUpdateStudent = async (e) => {
@@ -300,9 +302,11 @@ export default function AdminDashboard() {
       if (studentForm.password) formData.append('password', studentForm.password);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
       if (studentForm.session) formData.append('session', studentForm.session);
+      formData.append('gender', studentForm.gender);
+      formData.append('dob', studentForm.dob);
       await axios.put(`http://localhost:5000/api/admin/students/${studentForm.editId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student updated!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -551,6 +555,15 @@ export default function AdminDashboard() {
                   ) : (
                     <input type="password" name="password" value={studentForm.password} onChange={handleStudentFormChange} placeholder="Password" className="border p-2 rounded w-full md:w-32" required />
                   )}
+                  <div className="flex gap-2">
+                    <select name="gender" value={studentForm.gender} onChange={handleStudentFormChange} className="border p-2 rounded w-full md:w-48">
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <input type="date" name="dob" value={studentForm.dob} onChange={handleStudentFormChange} placeholder="Date of Birth" className="border p-2 rounded w-full md:w-48" />
+                  </div>
                   <input type="file" name="photo" accept="image/*" onChange={e => setStudentForm({ ...studentForm, photo: e.target.files[0] })} className="border p-2 rounded" />
                   <div className="flex gap-2">
                     <select name="session" value={studentForm.session} onChange={handleStudentFormChange} className="border p-2 rounded w-full md:w-48">
