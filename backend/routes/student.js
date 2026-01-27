@@ -26,7 +26,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const { term, session } = req.query;
   const db = await openDb();
   const results = await db.all(
-    'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ?',
+    'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ? AND approved = 1',
     [student_id, term, session]
   );
   const student = (await db.get('SELECT * FROM students WHERE student_id = ?', [student_id])) || { fullname: '', class: '', photo: '', gender: '', dob: '', admission_no: '' };
@@ -242,7 +242,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     let studentAverages = [];
     for (const s of classResults) {
       const sResults = await db.all(
-        'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ? AND approved = 1',
         [s.student_id, term, session]
       );
       if (sResults.length > 0) {
