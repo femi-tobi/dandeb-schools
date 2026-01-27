@@ -247,7 +247,7 @@ router.put('/manual/:id', async (req, res) => {
 
 // Fetch results by class
 router.get('/', async (req, res) => {
-  const { student_id, subject, term, session, class: className, approved } = req.query;
+  const { student_id, subject, term, session, class: className, approved, grade } = req.query;
   const db = await openDb();
 
   const whereClauses = [];
@@ -259,6 +259,7 @@ router.get('/', async (req, res) => {
   if (session) { whereClauses.push('session = ?'); params.push(session); }
   if (className) { whereClauses.push('class = ?'); params.push(className); }
   if (approved !== undefined) { whereClauses.push('approved = ?'); params.push(Number(approved) ? 1 : 0); }
+  if (grade) { whereClauses.push('grade = ?'); params.push(grade); }
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const sql = `SELECT * FROM results ${whereSql}`;
