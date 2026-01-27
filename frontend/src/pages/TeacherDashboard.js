@@ -643,30 +643,38 @@ export default function TeacherDashboard() {
                   <input type="text" name="session" value={historyFilters.session} onChange={handleHistoryFilterChange} placeholder="Session" className="border p-2 rounded w-32" />
             </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-[600px] w-full bg-green-50 rounded">
-                <thead className="bg-green-200">
-                  <tr>
-                    <th className="py-2 px-4 text-left text-green-900">Student ID</th>
-                    <th className="py-2 px-4 text-left text-green-900">Subject</th>
-                    <th className="py-2 px-4 text-left text-green-900">Score</th>
-                    <th className="py-2 px-4 text-left text-green-900">Grade</th>
-                    <th className="py-2 px-4 text-left text-green-900">Term</th>
-                    <th className="py-2 px-4 text-left text-green-900">Session</th>
-                  </tr>
-                </thead>
-                <tbody>
-                      {historyResults.map(r => (
-                        <tr key={r.id}>
-                      <td className="py-2 px-4">{r.student_id}</td>
-                      <td className="py-2 px-4">{r.subject}</td>
-                      <td className="py-2 px-4">{r.score}</td>
-                      <td className="py-2 px-4">{r.grade}</td>
-                      <td className="py-2 px-4">{r.term}</td>
-                      <td className="py-2 px-4">{r.session}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {/* Group results by student_id */}
+                {Object.entries(historyResults.reduce((acc, r) => {
+                  if (!acc[r.student_id]) acc[r.student_id] = [];
+                  acc[r.student_id].push(r);
+                  return acc;
+                }, {})).map(([student_id, results]) => (
+                  <div key={student_id} className="mb-6 border border-green-300 rounded p-4">
+                    <h4 className="font-bold text-green-800 mb-3">Student ID: {student_id} ({results.length} {results.length === 1 ? 'result' : 'results'})</h4>
+                    <table className="min-w-[500px] w-full bg-green-50 rounded">
+                      <thead className="bg-green-200">
+                        <tr>
+                          <th className="py-2 px-4 text-left text-green-900">Subject</th>
+                          <th className="py-2 px-4 text-left text-green-900">Score</th>
+                          <th className="py-2 px-4 text-left text-green-900">Grade</th>
+                          <th className="py-2 px-4 text-left text-green-900">Term</th>
+                          <th className="py-2 px-4 text-left text-green-900">Session</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map(r => (
+                          <tr key={r.id} className="border-b">
+                            <td className="py-2 px-4">{r.subject}</td>
+                            <td className="py-2 px-4">{r.score}</td>
+                            <td className="py-2 px-4">{r.grade}</td>
+                            <td className="py-2 px-4">{r.term}</td>
+                            <td className="py-2 px-4">{r.session}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
             </div>
               </div>
             )}
