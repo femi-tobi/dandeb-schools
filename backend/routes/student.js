@@ -99,6 +99,18 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     studentsInClass = classResults.length;
   } catch {}
 
+  // Fetch teacher's remark from database
+  let teacherRemark = '';
+  try {
+    const remarkRow = await db.get(
+      'SELECT remark FROM remarks WHERE student_id = ? AND class = ? AND term = ? AND session = ?',
+      [student_id, student.class, term, session]
+    );
+    teacherRemark = remarkRow?.remark || '';
+  } catch (e) {
+    console.error('Error fetching remark:', e);
+  }
+
   // STUDENT INFO SECTION
   // Row 1: Student Name with Passport
   doc.fontSize(11).font('Helvetica-Bold');
@@ -564,7 +576,7 @@ doc.fontSize(10).text('Promotional Status:', colX[0] + 5, remarksY + 5, { contin
 
 // Class Teacher's Remark
 remarksY += 20;
-const classRemark = "OLUMATOVIN you have a very good result, you have really done well. Please brace up more for a richer performance next term. See you at the top.";
+const classRemark = teacherRemark || "No remark provided.";
 doc.font('Helvetica-Bold').fontSize(9).text("Class Teacher's Remark:", colX[0] + 5, remarksY + 7);
 
 const remarkX = colX[0] + 140;
@@ -578,7 +590,7 @@ doc.text(classRemark, remarkX, remarkY, { width: remarkWidth, align: 'left' });
 
 // Head Teacher's Remark
 remarksY += boxHeight;
-const headRemark = "Commendable result indeed, you have very large room to perform better. OLUMATOVIN MORE! MORE!";
+const headRemark = `Commendable result indeed, you have very large room to perform better. ${student.fullname} MORE! MORE!`;
 doc.font('Helvetica-Bold').fontSize(9).text("Principal's Remark:", colX[0] + 5, remarksY + 7);
 const headRemarkHeight = doc.heightOfString(headRemark, { width: remarkWidth, align: 'left' });
 const headBoxHeight = Math.max(30, headRemarkHeight + 14);
