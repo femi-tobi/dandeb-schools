@@ -565,11 +565,21 @@ doc.font('Helvetica-Bold').fillColor('black').text(` ${grandTotal}`, { align: 'c
 doc.font('Helvetica').fillColor('black');
 
 // === PROMOTIONAL STATUS & REMARKS SECTION ===
-let remarksY = grandTotalY + 40;
-const remarksWidth = usableWidth - 160 - colX[0];
-const remarksYStart = grandTotalY + 0;
 
-// Promotional Status
+// Check if we need a page break before footer content
+const pageHeight = doc.page.height;
+const pageMargin = 60;
+const estimatedFooterHeight = 300;
+if (grandTotalY + estimatedFooterHeight > pageHeight - pageMargin) {
+  doc.addPage();
+  remarksY = pageMargin;
+} else {
+  remarksY = grandTotalY + 40;
+}
+
+// === PROMOTIONAL STATUS & REMARKS SECTION ===
+const remarksWidth = usableWidth - 160 - colX[0];
+const remarksYStart = remarksY;
 doc.font('Helvetica-Bold').rect(colX[0], remarksY, remarksWidth, 20).stroke();
 doc.fontSize(10).text('Promotional Status:', colX[0] + 5, remarksY + 5, { continued: true })
    .font('Helvetica').text('Passed');
@@ -633,14 +643,19 @@ gradingKey.forEach(row => {
 
 let contentBottomY = keyY;
 
-const borderWidth = doc.page.width - 2 * borderMargin;
-const borderHeight = contentBottomY - borderMargin + 20;
-doc.save();
-doc.lineWidth(1.7);
-doc.rect(borderMargin, borderMargin, borderWidth, borderHeight).stroke();
-doc.restore();
+// Border removed to allow natural pagination
 
   doc.end();
 });
 
 export default router;
+const pageHeight = doc.page.height;
+const pageMargin = 60;
+const estimatedFooterHeight = 300;
+if (grandTotalY + estimatedFooterHeight > pageHeight - pageMargin) {
+  doc.addPage();
+  remarksY = pageMargin;
+} else {
+  remarksY = grandTotalY + 40;
+}
+

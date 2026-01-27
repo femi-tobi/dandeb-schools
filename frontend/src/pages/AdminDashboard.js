@@ -752,7 +752,7 @@ export default function AdminDashboard() {
             {/* Modal for student results */}
             {historyModalOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                <div className="bg-white rounded shadow-lg p-6 max-w-2xl w-full relative">
+                <div className="bg-white rounded shadow-lg p-6 max-w-2xl w-full relative max-h-[90vh] overflow-y-auto">
                   <button className="absolute top-2 right-2 text-2xl" onClick={() => setHistoryModalOpen(false)}>&times;</button>
                   <h4 className="font-bold mb-4 text-green-700">Results for {historyModalStudent.student_id}</h4>
                   <div className="overflow-x-auto">
