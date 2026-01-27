@@ -564,8 +564,6 @@ doc.text('Grand Total=', colX[0] + 10, grandTotalY + 7, { continued: true });
 doc.font('Helvetica-Bold').fillColor('black').text(` ${grandTotal}`, { align: 'center' });
 doc.font('Helvetica').fillColor('black');
 
-// === PROMOTIONAL STATUS & REMARKS SECTION ===
-
 // Check if we need a page break before footer content
 const pageHeight = doc.page.height;
 const pageMargin = 60;
@@ -649,13 +647,3 @@ let contentBottomY = keyY;
 });
 
 export default router;
-const pageHeight = doc.page.height;
-const pageMargin = 60;
-const estimatedFooterHeight = 300;
-if (grandTotalY + estimatedFooterHeight > pageHeight - pageMargin) {
-  doc.addPage();
-  remarksY = pageMargin;
-} else {
-  remarksY = grandTotalY + 40;
-}
-
