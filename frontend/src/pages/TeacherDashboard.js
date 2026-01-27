@@ -37,7 +37,7 @@ export default function TeacherDashboard() {
   const [batchResults, setBatchResults] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('enter');
-  const [historyFilters, setHistoryFilters] = useState({ student_id: '', subject: '', term: '', session: '' });
+  const [historyFilters, setHistoryFilters] = useState({ student_id: '', subject: '', term: '', session: '', grade: '' });
   const [historyResults, setHistoryResults] = useState([]);
   const [remark, setRemark] = useState('');
   const [remarkMsg, setRemarkMsg] = useState('');
@@ -159,6 +159,7 @@ export default function TeacherDashboard() {
     if (historyFilters.subject) url += `&subject=${historyFilters.subject}`;
     if (historyFilters.term) url += `&term=${historyFilters.term}`;
     if (historyFilters.session) url += `&session=${historyFilters.session}`;
+    if (historyFilters.grade) url += `&grade=${historyFilters.grade}`;
     axios.get(url)
       .then(res => setHistoryResults(res.data))
       .catch(() => setHistoryResults([]));
@@ -641,6 +642,7 @@ export default function TeacherDashboard() {
                   <input type="text" name="subject" value={historyFilters.subject} onChange={handleHistoryFilterChange} placeholder="Subject" className="border p-2 rounded w-32" />
                   <input type="text" name="term" value={historyFilters.term} onChange={handleHistoryFilterChange} placeholder="Term" className="border p-2 rounded w-32" />
                   <input type="text" name="session" value={historyFilters.session} onChange={handleHistoryFilterChange} placeholder="Session" className="border p-2 rounded w-32" />
+                  <input type="text" name="grade" value={historyFilters.grade} onChange={handleHistoryFilterChange} placeholder="Grade" className="border p-2 rounded w-32" />
             </div>
                 <div className="overflow-x-auto">
                   {/* Group results by student_id */}
