@@ -21,6 +21,7 @@ export default function StudentDashboard() {
   const [session, setSession] = useState('');
   const [sessions, setSessions] = useState([]);
   const [teacherRemark, setTeacherRemark] = useState('');
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Fetch sessions on mount
   useEffect(() => {
@@ -62,6 +63,13 @@ export default function StudentDashboard() {
       .catch(() => setTeacherRemark(''));
   }, [term, session]);
 
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Poll for teacher remark periodically to reflect real-time updates
   useEffect(() => {
     const studentData = localStorage.getItem('student');
@@ -75,7 +83,18 @@ export default function StudentDashboard() {
     return () => clearInterval(intervalId);
   }, [term, session]);
 
-  // Calculate grand total and average based on components (CA1+CA2+Exam)
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Calculate
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Calculate) grand total and average based on components (CA1+CA2+Exam)
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
@@ -230,6 +249,31 @@ export default function StudentDashboard() {
           </button>
         </div>
       </main>
+
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
-} 
+}

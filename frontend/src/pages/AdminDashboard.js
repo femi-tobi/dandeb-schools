@@ -68,6 +68,7 @@ export default function AdminDashboard() {
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
   const [pendingModalResults, setPendingModalResults] = useState([]);
   const [pendingModalStudent, setPendingModalStudent] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [promotionMsg, setPromotionMsg] = useState('');
   const [selectedPending, setSelectedPending] = useState([]);
 
@@ -94,7 +95,11 @@ export default function AdminDashboard() {
       .catch(err => setClasses([]));
   }, []);
 
-  // Fetch students when selectedClass changes
+  // Fetch students
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Fetch students) when selectedClass changes
   useEffect(() => {
     if (selectedClass) {
       axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`)
@@ -114,6 +119,13 @@ export default function AdminDashboard() {
     }
   }, [activePanel]);
 
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Fetch subjects on mount or when panel is active
   useEffect(() => {
     if (activePanel === 'subjects' || activePanel === 'upload') {
@@ -123,7 +135,18 @@ export default function AdminDashboard() {
     }
   }, [activePanel]);
 
-  // Fetch students for the manual upload form when the selected class in the form changes
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch students
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Fetch students) for the manual upload form when the selected class in the form changes
   useEffect(() => {
     if (!form.class) {
       setUploadStudents([]);
@@ -997,6 +1020,19 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
