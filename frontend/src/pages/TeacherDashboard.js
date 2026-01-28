@@ -42,6 +42,7 @@ export default function TeacherDashboard() {
   const [remark, setRemark] = useState('');
   const [remarkMsg, setRemarkMsg] = useState('');
   const [gradeScores, setGradeScores] = useState({});
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Grade mapping function - returns grade code given a numeric percentage/total
   const getGrade = (percent) => {
@@ -164,6 +165,19 @@ export default function TeacherDashboard() {
       .then(res => setHistoryResults(res.data))
       .catch(() => setHistoryResults([]));
   }, [activeTab, selectedClass, historyFilters]);
+
+  // Show/hide scroll to top button based on scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.pageYOffset > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Handle input change for result form
   const handleResultInputChange = (student_id, field, value) => {
@@ -683,6 +697,18 @@ export default function TeacherDashboard() {
           </>
         )}
       </main>
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
