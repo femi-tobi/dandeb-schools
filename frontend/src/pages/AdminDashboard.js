@@ -95,11 +95,7 @@ export default function AdminDashboard() {
       .catch(err => setClasses([]));
   }, []);
 
-  // Fetch students
-
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  // Fetch students) when selectedClass changes
+  // Fetch students when selectedClass changes
   useEffect(() => {
     if (selectedClass) {
       axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`)
@@ -142,11 +138,9 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch students
-
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Fetch students) for the manual upload form when the selected class in the form changes
+  // Fetch students for the manual upload form when the selected class in the form changes
   useEffect(() => {
     if (!form.class) {
       setUploadStudents([]);
