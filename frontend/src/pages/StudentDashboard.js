@@ -90,11 +90,9 @@ export default function StudentDashboard() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Calculate
-
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Calculate) grand total and average based on components (CA1+CA2+Exam)
+  // Calculate grand total and average based on components (CA1+CA2+Exam)
   const grandTotal = results.reduce((sum, r) => {
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
