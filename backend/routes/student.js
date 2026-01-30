@@ -26,7 +26,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
   const { term, session } = req.query;
   const db = await openDb();
   const results = await db.all(
-    'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ?',
+    'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ? AND approved = 1',
     [student_id, term, session]
   );
   const student = (await db.get('SELECT * FROM students WHERE student_id = ?', [student_id])) || { fullname: '', class: '', photo: '', gender: '', dob: '', admission_no: '' };
@@ -99,6 +99,18 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     studentsInClass = classResults.length;
   } catch {}
 
+  // Fetch teacher's remark from database
+  let teacherRemark = '';
+  try {
+    const remarkRow = await db.get(
+      'SELECT remark FROM remarks WHERE student_id = ? AND class = ? AND term = ? AND session = ?',
+      [student_id, student.class, term, session]
+    );
+    teacherRemark = remarkRow?.remark || '';
+  } catch (e) {
+    console.error('Error fetching remark:', e);
+  }
+
   // STUDENT INFO SECTION
   // Row 1: Student Name with Passport
   doc.fontSize(11).font('Helvetica-Bold');
@@ -163,7 +175,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     doc.moveTo(infoColX[i], infoTableY).lineTo(infoColX[i], infoTableY + 40).stroke();
   }
   // Fill first row: Gender, Date of Birth, (empty)
-  doc.font('Helvetica-Bold').text('Gender:', infoColX[0] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.gender || 'Female');
+  doc.font('Helvetica-Bold').text('Gender:', infoColX[0] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.gender || '');
   doc.font('Helvetica-Bold').text('Date of Birth:', infoColX[1] + 5, infoTableY + 5, { continued: true }).font('Helvetica').text(student.dob || '');
   // Second row: Class, Students in Class, (empty)
   doc.font('Helvetica-Bold').text('Class:', infoColX[0] + 5, infoTableY + 25, { continued: true }).font('Helvetica').text(student.class || '');
@@ -230,7 +242,7 @@ router.get('/:student_id/result/pdf', async (req, res) => {
     let studentAverages = [];
     for (const s of classResults) {
       const sResults = await db.all(
-        'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ?',
+        'SELECT * FROM results WHERE student_id = ? AND term = ? AND session = ? AND approved = 1',
         [s.student_id, term, session]
       );
       if (sResults.length > 0) {
@@ -552,19 +564,28 @@ doc.text('Grand Total=', colX[0] + 10, grandTotalY + 7, { continued: true });
 doc.font('Helvetica-Bold').fillColor('black').text(` ${grandTotal}`, { align: 'center' });
 doc.font('Helvetica').fillColor('black');
 
-// === PROMOTIONAL STATUS & REMARKS SECTION ===
-let remarksY = grandTotalY + 40;
-const remarksWidth = usableWidth - 160 - colX[0];
-const remarksYStart = grandTotalY + 0;
+// Check if we need a page break before footer content
+let remarksY;
+const pageHeight = doc.page.height;
+const pageMargin = 60;
+const estimatedFooterHeight = 300;
+if (grandTotalY + estimatedFooterHeight > pageHeight - pageMargin) {
+  doc.addPage();
+  remarksY = pageMargin;
+} else {
+  remarksY = grandTotalY + 40;
+}
 
-// Promotional Status
+// === PROMOTIONAL STATUS & REMARKS SECTION ===
+const remarksWidth = usableWidth - 160 - colX[0];
+const remarksYStart = remarksY;
 doc.font('Helvetica-Bold').rect(colX[0], remarksY, remarksWidth, 20).stroke();
 doc.fontSize(10).text('Promotional Status:', colX[0] + 5, remarksY + 5, { continued: true })
    .font('Helvetica').text('Passed');
 
 // Class Teacher's Remark
 remarksY += 20;
-const classRemark = "OLUMATOVIN you have a very good result, you have really done well. Please brace up more for a richer performance next term. See you at the top.";
+const classRemark = teacherRemark || "No remark provided.";
 doc.font('Helvetica-Bold').fontSize(9).text("Class Teacher's Remark:", colX[0] + 5, remarksY + 7);
 
 const remarkX = colX[0] + 140;
@@ -578,7 +599,7 @@ doc.text(classRemark, remarkX, remarkY, { width: remarkWidth, align: 'left' });
 
 // Head Teacher's Remark
 remarksY += boxHeight;
-const headRemark = "Commendable result indeed, you have very large room to perform better. OLUMATOVIN MORE! MORE!";
+const headRemark = `Commendable result indeed, you have very large room to perform better. ${student.fullname} MORE! MORE!`;
 doc.font('Helvetica-Bold').fontSize(9).text("Principal's Remark:", colX[0] + 5, remarksY + 7);
 const headRemarkHeight = doc.heightOfString(headRemark, { width: remarkWidth, align: 'left' });
 const headBoxHeight = Math.max(30, headRemarkHeight + 14);
@@ -621,12 +642,7 @@ gradingKey.forEach(row => {
 
 let contentBottomY = keyY;
 
-const borderWidth = doc.page.width - 2 * borderMargin;
-const borderHeight = contentBottomY - borderMargin + 20;
-doc.save();
-doc.lineWidth(1.7);
-doc.rect(borderMargin, borderMargin, borderWidth, borderHeight).stroke();
-doc.restore();
+// Border removed to allow natural pagination
 
   doc.end();
 });

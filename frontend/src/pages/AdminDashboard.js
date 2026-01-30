@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   // Add/Edit Students state
   const [selectedClass, setSelectedClass] = useState('');
   const [studentsList, setStudentsList] = useState([]);
-  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+  const [studentForm, setStudentForm] = useState({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
   const [studentMsg, setStudentMsg] = useState('');
 
   // Manage Teachers state
@@ -68,6 +68,7 @@ export default function AdminDashboard() {
   const [pendingModalOpen, setPendingModalOpen] = useState(false);
   const [pendingModalResults, setPendingModalResults] = useState([]);
   const [pendingModalStudent, setPendingModalStudent] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [promotionMsg, setPromotionMsg] = useState('');
   const [selectedPending, setSelectedPending] = useState([]);
 
@@ -114,6 +115,13 @@ export default function AdminDashboard() {
     }
   }, [activePanel]);
 
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Fetch subjects on mount or when panel is active
   useEffect(() => {
     if (activePanel === 'subjects' || activePanel === 'upload') {
@@ -122,6 +130,15 @@ export default function AdminDashboard() {
         .catch(() => setSubjects([]));
     }
   }, [activePanel]);
+
+  // Show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.pageYOffset > 300);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   // Fetch students for the manual upload form when the selected class in the form changes
   useEffect(() => {
@@ -274,10 +291,12 @@ export default function AdminDashboard() {
       formData.append('class', selectedClass);
       formData.append('password', studentForm.password);
       formData.append('session', studentForm.session);
+      formData.append('gender', studentForm.gender);
+      formData.append('dob', studentForm.dob);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
       await axios.post('http://localhost:5000/api/admin/students', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student added!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -287,7 +306,7 @@ export default function AdminDashboard() {
   };
 
   const handleEditStudent = (student) => {
-    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null, session: '' });
+    setStudentForm({ fullname: student.fullname, student_id: student.student_id, password: '', editId: student.id, photo: null, session: '', gender: student.gender || '', dob: student.dob || '' });
   };
 
   const handleUpdateStudent = async (e) => {
@@ -300,9 +319,11 @@ export default function AdminDashboard() {
       if (studentForm.password) formData.append('password', studentForm.password);
       if (studentForm.photo) formData.append('photo', studentForm.photo);
       if (studentForm.session) formData.append('session', studentForm.session);
+      formData.append('gender', studentForm.gender);
+      formData.append('dob', studentForm.dob);
       await axios.put(`http://localhost:5000/api/admin/students/${studentForm.editId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       setStudentMsg('Student updated!');
-      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '' });
+      setStudentForm({ fullname: '', student_id: '', password: '', editId: null, photo: null, session: '', gender: '', dob: '' });
       // Refresh student list
       const res = await axios.get(`http://localhost:5000/api/admin/students?class=${selectedClass}`);
       setStudentsList(res.data);
@@ -551,6 +572,15 @@ export default function AdminDashboard() {
                   ) : (
                     <input type="password" name="password" value={studentForm.password} onChange={handleStudentFormChange} placeholder="Password" className="border p-2 rounded w-full md:w-32" required />
                   )}
+                  <div className="flex gap-2">
+                    <select name="gender" value={studentForm.gender} onChange={handleStudentFormChange} className="border p-2 rounded w-full md:w-48">
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <input type="date" name="dob" value={studentForm.dob} onChange={handleStudentFormChange} placeholder="Date of Birth" className="border p-2 rounded w-full md:w-48" />
+                  </div>
                   <input type="file" name="photo" accept="image/*" onChange={e => setStudentForm({ ...studentForm, photo: e.target.files[0] })} className="border p-2 rounded" />
                   <div className="flex gap-2">
                     <select name="session" value={studentForm.session} onChange={handleStudentFormChange} className="border p-2 rounded w-full md:w-48">
@@ -739,7 +769,7 @@ export default function AdminDashboard() {
             {/* Modal for student results */}
             {historyModalOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-                <div className="bg-white rounded shadow-lg p-6 max-w-2xl w-full relative">
+                <div className="bg-white rounded shadow-lg p-6 max-w-2xl w-full relative max-h-[90vh] overflow-y-auto">
                   <button className="absolute top-2 right-2 text-2xl" onClick={() => setHistoryModalOpen(false)}>&times;</button>
                   <h4 className="font-bold mb-4 text-green-700">Results for {historyModalStudent.student_id}</h4>
                   <div className="overflow-x-auto">
@@ -984,6 +1014,19 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

@@ -37,11 +37,12 @@ export default function TeacherDashboard() {
   const [batchResults, setBatchResults] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('enter');
-  const [historyFilters, setHistoryFilters] = useState({ student_id: '', subject: '', term: '', session: '' });
+  const [historyFilters, setHistoryFilters] = useState({ student_id: '', subject: '', term: '', session: '', grade: '' });
   const [historyResults, setHistoryResults] = useState([]);
   const [remark, setRemark] = useState('');
   const [remarkMsg, setRemarkMsg] = useState('');
   const [gradeScores, setGradeScores] = useState({});
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Grade mapping function - returns grade code given a numeric percentage/total
   const getGrade = (percent) => {
@@ -159,10 +160,24 @@ export default function TeacherDashboard() {
     if (historyFilters.subject) url += `&subject=${historyFilters.subject}`;
     if (historyFilters.term) url += `&term=${historyFilters.term}`;
     if (historyFilters.session) url += `&session=${historyFilters.session}`;
+    if (historyFilters.grade) url += `&grade=${historyFilters.grade}`;
     axios.get(url)
       .then(res => setHistoryResults(res.data))
       .catch(() => setHistoryResults([]));
   }, [activeTab, selectedClass, historyFilters]);
+
+  // Show/hide scroll to top button based on scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.pageYOffset > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Handle input change for result form
   const handleResultInputChange = (student_id, field, value) => {
@@ -641,38 +656,59 @@ export default function TeacherDashboard() {
                   <input type="text" name="subject" value={historyFilters.subject} onChange={handleHistoryFilterChange} placeholder="Subject" className="border p-2 rounded w-32" />
                   <input type="text" name="term" value={historyFilters.term} onChange={handleHistoryFilterChange} placeholder="Term" className="border p-2 rounded w-32" />
                   <input type="text" name="session" value={historyFilters.session} onChange={handleHistoryFilterChange} placeholder="Session" className="border p-2 rounded w-32" />
+                  <input type="text" name="grade" value={historyFilters.grade} onChange={handleHistoryFilterChange} placeholder="Grade" className="border p-2 rounded w-32" />
             </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-[600px] w-full bg-green-50 rounded">
-                <thead className="bg-green-200">
-                  <tr>
-                    <th className="py-2 px-4 text-left text-green-900">Student ID</th>
-                    <th className="py-2 px-4 text-left text-green-900">Subject</th>
-                    <th className="py-2 px-4 text-left text-green-900">Score</th>
-                    <th className="py-2 px-4 text-left text-green-900">Grade</th>
-                    <th className="py-2 px-4 text-left text-green-900">Term</th>
-                    <th className="py-2 px-4 text-left text-green-900">Session</th>
-                  </tr>
-                </thead>
-                <tbody>
-                      {historyResults.map(r => (
-                        <tr key={r.id}>
-                      <td className="py-2 px-4">{r.student_id}</td>
-                      <td className="py-2 px-4">{r.subject}</td>
-                      <td className="py-2 px-4">{r.score}</td>
-                      <td className="py-2 px-4">{r.grade}</td>
-                      <td className="py-2 px-4">{r.term}</td>
-                      <td className="py-2 px-4">{r.session}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {/* Group results by student_id */}
+                {Object.entries(historyResults.reduce((acc, r) => {
+                  if (!acc[r.student_id]) acc[r.student_id] = [];
+                  acc[r.student_id].push(r);
+                  return acc;
+                }, {})).map(([student_id, results]) => (
+                  <div key={student_id} className="mb-6 border border-green-300 rounded p-4">
+                    <h4 className="font-bold text-green-800 mb-3">Student ID: {student_id} ({results.length} {results.length === 1 ? 'result' : 'results'})</h4>
+                    <table className="min-w-[500px] w-full bg-green-50 rounded">
+                      <thead className="bg-green-200">
+                        <tr>
+                          <th className="py-2 px-4 text-left text-green-900">Subject</th>
+                          <th className="py-2 px-4 text-left text-green-900">Score</th>
+                          <th className="py-2 px-4 text-left text-green-900">Grade</th>
+                          <th className="py-2 px-4 text-left text-green-900">Term</th>
+                          <th className="py-2 px-4 text-left text-green-900">Session</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map(r => (
+                          <tr key={r.id} className="border-b">
+                            <td className="py-2 px-4">{r.subject}</td>
+                            <td className="py-2 px-4">{r.score}</td>
+                            <td className="py-2 px-4">{r.grade}</td>
+                            <td className="py-2 px-4">{r.term}</td>
+                            <td className="py-2 px-4">{r.session}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
             </div>
               </div>
             )}
           </>
         )}
       </main>
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-green-600 hover:bg-green-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 z-50"
+          aria-label="Scroll to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
