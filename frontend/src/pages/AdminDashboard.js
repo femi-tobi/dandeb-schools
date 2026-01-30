@@ -262,12 +262,14 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteClass = async (name) => {
+    if (!window.confirm(`Are you sure you want to delete the class "${name}"? This action cannot be undone.`)) return;
     try {
       // Find class id
       const cls = classes.find(c => c.name === name);
       if (!cls || !cls.id) return;
       await axios.delete(`http://localhost:5000/api/classes/${cls.id}`);
       setClasses(classes.filter(c => c.name !== name));
+      setClassMsg('Class deleted successfully!');
     } catch (err) {
       setClassMsg('Error deleting class.');
     }
@@ -423,10 +425,12 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteSubject = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this subject? This action cannot be undone.')) return;
     try {
       await axios.delete(`http://localhost:5000/api/subjects/${id}`);
       const res = await axios.get('http://localhost:5000/api/subjects');
       setSubjects(res.data);
+      setSubjectMsg('Subject deleted successfully!');
     } catch (err) {
       setSubjectMsg('Error deleting subject.');
     }
@@ -447,9 +451,11 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteSession = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) return;
     try {
       await axios.delete(`http://localhost:5000/api/sessions/${id}`);
       setSessions(sessions.filter(s => s.id !== id));
+      setSessionMsg('Session deleted successfully!');
     } catch (err) {
       setSessionMsg('Error deleting session.');
     }
@@ -514,6 +520,39 @@ export default function AdminDashboard() {
         setPendingModalStudent(student);
         setPendingModalOpen(true);
       });
+  };
+
+  const denyResults = (student_id, term, session) => {
+    if (!window.confirm('Are you sure you want to deny and delete these results? This action cannot be undone.')) return;
+    axios.post('http://localhost:5000/api/admin/deny-student-results', { student_id, term, session })
+      .then(() => {
+        setPendingStudents(pendingStudents.filter(
+          s => !(s.student_id === student_id && s.term === term && s.session === session)
+        ));
+        setPendingModalOpen(false);
+        alert('Results denied and deleted!');
+      })
+      .catch(() => alert('Failed to deny results.'));
+  };
+
+  const handleDenySelected = async () => {
+    if (selectedPending.length === 0) return alert('No pending items selected');
+    if (!window.confirm(`Are you sure you want to deny and delete ${selectedPending.length} selected result(s)? This action cannot be undone.`)) return;
+    const items = selectedPending.map(key => {
+      const [student_id, term, session] = key.split('||');
+      return { student_id, term, session };
+    });
+    try {
+      await axios.post('http://localhost:5000/api/admin/deny-results-bulk', { items });
+      // Filter out denied from pendingStudents
+      const remaining = pendingStudents.filter(s => !selectedPending.includes(`${s.student_id}||${s.term}||${s.session}`));
+      setPendingStudents(remaining);
+      setSelectedPending([]);
+      alert('Selected results denied and deleted');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to deny selected results');
+    }
   };
 
   // Handler for promoting a student
@@ -961,15 +1000,22 @@ export default function AdminDashboard() {
                           className="bg-green-600 hover:bg-green-800 text-white px-3 py-1 rounded"
                           onClick={() => approveResults(s.student_id, s.term, s.session)}
                         >
-                          Approve Results
+                          Approve
+                        </button>
+                        <button
+                          className="bg-red-600 hover:bg-red-800 text-white px-3 py-1 rounded"
+                          onClick={() => denyResults(s.student_id, s.term, s.session)}
+                        >
+                          Deny
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div className="mt-3">
-                <button className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded mr-2" onClick={handleApproveSelected} disabled={selectedPending.length === 0}>Approve Selected</button>
+              <div className="mt-3 flex gap-2 items-center flex-wrap">
+                <button className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded" onClick={handleApproveSelected} disabled={selectedPending.length === 0}>Approve Selected</button>
+                <button className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onClick={handleDenySelected} disabled={selectedPending.length === 0}>Deny Selected</button>
                 <span className="text-sm text-gray-600">{selectedPending.length} selected</span>
               </div>
               </>
@@ -979,7 +1025,7 @@ export default function AdminDashboard() {
         {/* Modal for pending result details */}
         {pendingModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative w-full max-w-xl">
+            <div className="bg-white rounded-lg shadow-lg p-6 relative w-full max-w-xl max-h-[90vh] overflow-y-auto">
               <button className="absolute top-2 right-2 text-2xl" onClick={() => setPendingModalOpen(false)}>&times;</button>
               <h4 className="font-bold mb-4 text-green-700">Pending Results for {pendingModalStudent?.fullname} ({pendingModalStudent?.student_id})</h4>
               {pendingModalResults.length === 0 ? (
@@ -1004,12 +1050,20 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               )}
-              <button
-                className="bg-green-600 hover:bg-green-800 text-white px-4 py-2 rounded"
-                onClick={() => approveResults(pendingModalStudent.student_id, pendingModalStudent.term, pendingModalStudent.session)}
-              >
-                Approve Results
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="bg-green-600 hover:bg-green-800 text-white px-4 py-2 rounded"
+                  onClick={() => approveResults(pendingModalStudent.student_id, pendingModalStudent.term, pendingModalStudent.session)}
+                >
+                  Approve Results
+                </button>
+                <button
+                  className="bg-red-600 hover:bg-red-800 text-white px-4 py-2 rounded"
+                  onClick={() => denyResults(pendingModalStudent.student_id, pendingModalStudent.term, pendingModalStudent.session)}
+                >
+                  Deny Results
+                </button>
+              </div>
             </div>
           </div>
         )}
