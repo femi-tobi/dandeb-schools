@@ -3,7 +3,9 @@ cd /d "%~dp0"
 
 echo Updating project from GitHub...
 git pull
+echo project pulled...
 git add .
+echo project pulled...
 git commit -m "data"
 git push
 
