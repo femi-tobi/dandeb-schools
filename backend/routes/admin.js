@@ -138,6 +138,39 @@ router.post('/approve-results-bulk', async (req, res) => {
   }
 });
 
+// Deny all results for a student for a term/session (delete them)
+router.post('/deny-student-results', async (req, res) => {
+  const { student_id, term, session } = req.body;
+  const db = await openDb();
+  try {
+    await db.run(
+      'DELETE FROM results WHERE student_id = ? AND term = ? AND session = ?',
+      [student_id, term, session]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'DB error' });
+  }
+});
+
+// Bulk deny: accepts an array of items { student_id, term, session }
+router.post('/deny-results-bulk', async (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'No items provided' });
+  const db = await openDb();
+  try {
+    for (const it of items) {
+      const { student_id, term, session } = it;
+      if (!student_id || !term || !session) continue;
+      await db.run('DELETE FROM results WHERE student_id = ? AND term = ? AND session = ?', [student_id, term, session]);
+    }
+    res.json({ success: true, processed: items.length });
+  } catch (err) {
+    console.error('Bulk deny error', err);
+    res.status(500).json({ message: 'DB error' });
+  }
+});
+
 // === PROMOTION LOGIC ===
 router.post('/students/:student_id/promote', async (req, res) => {
   const { student_id } = req.params;
